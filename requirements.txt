@@ -1,4 +1,2 @@
 astropy
 astroquery
-urllib2
-bs4
