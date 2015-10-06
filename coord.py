@@ -48,14 +48,28 @@ class coord():
     
     def __str__(self):
         if self.type == 'ra':
-            sg = ''
+            sg = ' '
         elif self.sign > 0:
             sg = '+'
         elif self.sign < 0:
             sg = '-'
         else:
-            sg = ''
-        return sg+ str(self.h) + ':' + str(self.m) + ':' + str(self.s)
+            sg = ' '
+        [sh, sm, ss] = [str(self.h), str(self.m), str(round(self.s, 2))]
+        if len(sh) < 2:
+            sh = ' ' + sh
+        if len(sm) < 2:
+            sm = ' ' + sm
+        ss = ss.split('.')
+        if len(ss[0]) < 2:
+            ss[0] = ' ' + ss[0]
+        if len(ss[1]) == 1:
+            ss[1] = ss[1] + ' '
+        if len(ss[1]) == 0:
+            ss[1] = '  '
+        ss = ss[0] + '.' + ss[1]
+            
+        return sg+ sh + ':' + sm + ':' + ss
     
     def __repr__(self):
         return self.type + ':  ' + self.__str__()
