@@ -4,10 +4,10 @@ from astroquery.vizier import Vizier
 from compute import *
 from utils import parse_date, parse_coord
 
-def process_vdb(vdbname, fields, sun, ind, ra_interest, dec_interest, print_coord = True):
+def process_vdb(vdbname, gfields, sun, ind, ra_interest, dec_interest, print_coord = True, print_head = True):
     
     lcol = 12
-    
+    fields = [] + gfields
     fields.append('RAJ2000')
     fields.append('DEJ2000')
     v = Vizier(columns = fields, catalog = vdbname)
@@ -34,10 +34,11 @@ def process_vdb(vdbname, fields, sun, ind, ra_interest, dec_interest, print_coor
         prhead = prhead + ' ' + tmp
     prhead = prhead + ' ' + 'Dec distance'
     prline = prline + '=' + '============'
-        
-    print prline
-    print prhead
-    print prline
+     
+    if print_head:   
+        print prline
+        print prhead
+        print prline
     
     for i in xrange(numobjs):
         ri = result[0][i].as_void()
@@ -84,3 +85,73 @@ def process_vdb(vdbname, fields, sun, ind, ra_interest, dec_interest, print_coor
                 printer = printer + ' ' + x
             printer = printer + ' ' + str(dist)
             print printer
+
+def handle_date(date, records, catalogue, vphi = 15):
+    mdays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    
+    sun = []
+    for i in xrange(len(records[0])):
+        sun.append([parse_date(records[0][i]), parse_coord(records[1][i], 'ra'), parse_coord(records[2][i], 'deg')])
+    ay = sun[ 0][0][-1]
+    by = sun[-1][0][-1]
+    
+    if len(date) == 3:
+        im = 1 # index of month
+        iy = 2 # index of year (in date list)
+       
+    elif len(date) == 2:
+        im = 0
+        iy = 1
+    
+    assert (date[im] >   0) and (date[im] <= 12), "Inccorect month value"
+    assert (date[iy] >= ay) and (date[iy] <= by), "Selected year is not presented in current sun ephemeris"
+    
+    if catalogue == 'V/50':
+        fields = ['Name', 'HD', 'Vmag']
+        entry_phrase = "Catalogue V50: stars with m <= 6.5"
+    elif catalogue == 'VII/239A/icpos':
+        entry_phrase = "\nCatalogue VII/239A/icpos: mean position of NGC/IC objects"
+        fields = ['NGC/IC']
+    else:
+        print "Unknown catalogue"
+        return None
+    
+    if date[iy] % 4 == 0:
+        mdays[1] += 1
+    
+    if len(date) == 3:
+        days = [date[0]]
+    elif len(date) == 2:
+        days = range(1, mdays[date[im]-1] + 1)
+        
+    for ind0, row in enumerate(sun):
+        if [days[0], date[im], date[iy]] in row:
+            break
+            
+    print entry_phrase
+
+    for ind in xrange(ind0, ind0 + len(days)):
+
+        ra_interest = str(sun[ind-1][1]) + '..' + str(sun[ind+1][1])
+        a = sun[ind-1][2]
+        b = sun[ind+1][2]
+        if a.f2s() < b.f2s():
+            c = a
+            d = b
+        else:
+            c = b
+            d = a
+
+        phi = coord(vphi,0,0,1,'deg')
+
+        dec_interest = str(c - phi) + '..' + str(d + phi)
+
+        ra_interest = ra_interest.replace(' ', '')
+        dec_interest = dec_interest.replace(' ', '')
+
+        if ind != ind0:
+            prhead = False
+        else:
+            prhead= True
+        process_vdb(catalogue, fields, sun, ind, ra_interest, dec_interest, print_head = prhead)
+        print
