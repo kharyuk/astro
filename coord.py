@@ -29,6 +29,11 @@ class coord():
         m += h*self.mlim
         s += m*self.slim
         return s*self.sign
+
+    def f2hd(self):
+        g = self.f2s()
+        g /= (self.slim * self.mlim)
+        return g
     
     def __init__(self, a, b, c,sign = 1, type = 'ra'):
         self.sign = sign
@@ -43,7 +48,7 @@ class coord():
             self.slim = 60.
         else:
             print 'Unknown type'
-        [self.h, self.m, self.s] = self.truncate(a, b, c)
+        [self.h, self.m, self.s] = self.truncate(abs(a), abs(b), abs(c))
         return
     
     def __str__(self):
