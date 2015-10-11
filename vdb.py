@@ -111,7 +111,7 @@ def handle_date(date, records, catalogue, vphi = 15):
         entry_phrase = "Catalogue V50: stars with m <= 6.5"
     elif catalogue == 'VII/239A/icpos':
         entry_phrase = "\nCatalogue VII/239A/icpos: mean position of NGC/IC objects"
-        fields = ['NGC/IC']
+        fields = ['NGC/IC', 'Cat']
     else:
         print "Unknown catalogue"
         return None
@@ -145,6 +145,8 @@ def handle_date(date, records, catalogue, vphi = 15):
         phi = coord(vphi,0,0,1,'deg')
 
         dec_interest = str(c - phi) + '..' + str(d + phi)
+
+        print ra_interest, dec_interest
 
         ra_interest = ra_interest.replace(' ', '')
         dec_interest = dec_interest.replace(' ', '')
