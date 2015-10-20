@@ -18,7 +18,7 @@ def numdays(day, month, vis = False):
     tmp += day
     return tmp - 1
 
-def comp_time(sun1, sun2, sun3, star):
+def comp_time_old(sun1, sun2, sun3, star):
     st = star.f2s()
     s1 = sun1.f2s()
     s2 = sun2.f2s()
@@ -37,6 +37,18 @@ def comp_time(sun1, sun2, sun3, star):
     vra = ds / star_day # velocity
     t = coord(0, 0, pra / vra)# time of intersection
     return t, num
+
+def comp_time(sun1, sun2, star):
+    st = star.f2s()
+    s1 = sun1.f2s()
+    s2 = sun2.f2s()
+    assert (st >= s1) and (s2 > st), 'Object is not in interval'
+    ds = sun2 - sun1
+    point = star - sun1 # intersection path
+    pra = point.f2s() # path in seconds
+    vra = ds / star_day # velocity
+    t = coord(0, 0, pra / vra)# time of intersection
+    return t
 
 def comp_dist(day, mon, time, obj_dec):
     N = numdays(day, mon)
