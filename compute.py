@@ -56,4 +56,4 @@ def comp_dist(day, mon, time, obj_dec):
     N += tm / star_day
     sd = sundec(N)
     sun_dec = coord(0,0,abs(sd)*3600,np.sign(sd),'deg')
-    return sun_dec - obj_dec
+    return obj_dec - sun_dec# - obj_dec
