@@ -51,7 +51,7 @@ class coord():
         [self.h, self.m, self.s] = self.truncate(abs(a), abs(b), abs(c))
         return
     
-    def __str__(self):
+    def __str__(self, rpar = 2):
         if self.type == 'ra':
             sg = ' '
         elif self.sign > 0:
@@ -60,20 +60,23 @@ class coord():
             sg = '-'
         else:
             sg = ' '
-        [sh, sm, ss] = [str(self.h), str(self.m), str(round(self.s, 2))]
+        [sh, sm, ss] = [str(self.h), str(self.m), str(round(self.s, rpar))]
         if len(sh) < 2:
-            sh = ' ' + sh
+            sh = '0' + sh
         if len(sm) < 2:
-            sm = ' ' + sm
+            sm = '0' + sm
         ss = ss.split('.')
         if len(ss[0]) < 2:
-            ss[0] = ' ' + ss[0]
+            ss[0] = '0' + ss[0]
         if len(ss[1]) == 1:
-            ss[1] = ss[1] + ' '
+            ss[1] = ss[1] + '0'
         if len(ss[1]) == 0:
-            ss[1] = '  '
+            ss[1] = '00'
         ss = ss[0] + '.' + ss[1]
-            
+        if rpar == 0:
+            ss = str(int(np.trunc(self.s)))
+            if len(ss) < 2:
+                ss = '0'+ss
         return sg+ sh + ':' + sm + ':' + ss
     
     def __repr__(self):
