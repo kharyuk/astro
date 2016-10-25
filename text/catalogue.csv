@@ -1,0 +1,13 @@
+code,name,fullname,comment
+'aco','ACO','Abell catalog of rich clusters of galaxies','Каталог скоплений галактик Эйбелла'
+'gcl','GCL','Globular clusters','Шаровые звёздные скопления'
+'hh','HH','Herbig–Haro object','Объекты Хервига-Аро'
+'hip','HIP','Hipparcos','Звёздный каталог Hipparcos (Гиппарх)'
+'lbn','LBN','Lynds` Catalogue of Bright Nebulae','Каталог ярких туманностей Линда'
+'leda','LEDA','Lyon-Meudon Extragalactic Database','Каталог галактик Лиона-Меудона'
+'ocl','OCL','Open clusters','Рассеянные звёздные скопления'
+'pn','PN','Planetary Nebulae','Планетарные туманности'
+'qso','QSO','Quasi-stellar objects','Квазары, блазары'
+'snr','SNR','Super-nova remnants','Остатки сверхновых'
+'dne','DNE','Dark nebulae','Тёмные туманности'
+'rne','RNE','Reflection nebulae','Отражательные туманности'
