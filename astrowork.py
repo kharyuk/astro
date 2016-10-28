@@ -48,12 +48,14 @@ def loadTableParameters(directory, filename):
         for row in fid:
             # angle distance
             vphi = row['vphi']
-            if vphi.startswith('['):
-                vphi = eval(vphi)
-                phi_vec = True
+            vphi = eval(vphi)
+            if len(vphi) == 1:
+                if vphi[0][0] is None:            
+                    phi_vec = False
+                else:
+                    phi_vec = True
             else:
-                vphi = float(vphi)
-                phi_vec = False
+                phi_vec = True
             # columns
             if len(row['columns']) == 0:
                 columns = []
@@ -79,26 +81,26 @@ def make_list_header(ws, code, code_table):
     style = xlwt.easyxf(style_string)
     
     [rowx, colx] = [0, 0]
-    ws.write(rowx, colx, code_table[code]['fullname'], style=style)
+    ws.write(rowx, colx, code_table[code]['fullname'].decode('utf8'), style=style)
     rowx += 1
     ws.write(rowx, colx, code_table[code]['comment'].decode('utf8'), style=style)
     rowx += 1
     base = ['Date', 'Time']
     for x in base:
-        ws.write(rowx, colx, x, style=style)
+        ws.write(rowx, colx, x.decode('utf8'), style=style)
         colx += 1
     if code_table[code]['use_name']:
-        ws.write(rowx, colx, 'Name', style=style)
+        ws.write(rowx, colx, 'Name'.decode('utf8'), style=style)
         colx += 1
     for x in code_table[code]['columns']:
-        ws.write(rowx, colx, x.upper(), style=style)
+        ws.write(rowx, colx, x.upper().decode('utf8'), style=style)
         colx += 1
     if code_table[code]['phi_vec']:
-        ws.write(rowx, colx, 'Flux(V)', style=style)
+        ws.write(rowx, colx, 'Flux(V)'.decode('utf8'), style=style)
         colx += 1
     base = ['Dist', 'RA', 'DEC']
     for x in base:
-        ws.write(rowx, colx, x, style=style)
+        ws.write(rowx, colx, x.decode('utf8'), style=style)
         colx += 1
     rowx += 1
     colx = 0
@@ -112,13 +114,16 @@ def formulate_query(code, ra_interest, dec_interest):
 
 def write_row(ws, buffer_list, rowx, colx=0):
     for element in buffer_list:
-        ws.write(rowx, colx, element)
+        ws.write(rowx, colx, element.decode('utf8'))
         colx += 1
     rowx += 1
     colx = 0
     return rowx, colx
 
-def main_process(code, day_start, day_end, mpf=12, directory=CATLISTDIR, filename=DEFAULTSETTINGSFILE):
+def aw_main_process(code, day_start, day_end, mpf=12,
+                                           directory=CATLISTDIR,
+                                           filename=DEFAULTSETTINGSFILE,
+                                           progressBar=None):
     style_string = "font: bold on"
     style = xlwt.easyxf(style_string)
     
@@ -130,7 +135,7 @@ def main_process(code, day_start, day_end, mpf=12, directory=CATLISTDIR, filenam
     wb = xlwt.Workbook()
     sheetname = curdate.strftime('%h') + ' ' + str(curdate.year)[-2:]
     sheet_num = 0
-    ws = wb.add_sheet(sheetname)
+    ws = wb.add_sheet(sheetname.decode('utf8'))
     rowx, colx = make_list_header(ws, code, code_table)
     
     customSimbad = Simbad()
@@ -146,6 +151,7 @@ def main_process(code, day_start, day_end, mpf=12, directory=CATLISTDIR, filenam
     
     all_days = (day_end - day_start).days
     for numday in xrange(all_days):
+        objects_per_day = 0
         if curdate.month != curmonth:
             curmonth = curdate.month
             sheet_num += 1
@@ -160,13 +166,10 @@ def main_process(code, day_start, day_end, mpf=12, directory=CATLISTDIR, filenam
                 sheet_num = 0
                 day_start = curdate + datetime.timedelta(days=0)
             sheetname = curdate.strftime('%h') + ' ' + str(curdate.year)[-2:]
-            ws = wb.add_sheet(sheetname)
+            ws = wb.add_sheet(sheetname.decode('utf8'))
             rowx, colx = make_list_header(ws, code, code_table)
             
-        if code_table[code]['phi_vec']:
-            vphi = code_table[code]['vphi'][0][1]
-        else:
-            vphi = code_table[code]['vphi']
+        vphi = code_table[code]['vphi'][0][1]
     
         [[ra1, dec1], [ra2, dec2]] = ephsun(curdate)
         if dec1.f2s() < dec2.f2s():
@@ -178,13 +181,14 @@ def main_process(code, day_start, day_end, mpf=12, directory=CATLISTDIR, filenam
         dec_interest = [(c - phi).f2hd(), (d + phi).f2hd()]
         query = formulate_query(code, ra_interest, dec_interest)
 
-        print query
         result = customSimbad.query_criteria(query)
         if result is not None:
             lenres = len(result)
             result.sort('RA')
         else:
-            print "Day %d/%d [%s] finished w/o data" % (numday+1, all_days, curdate.strftime('%d-%m-%Y'))
+            print "Day %d/%d finished w/o output" % (numday+1, all_days)
+            if progressBar is not None:
+                progressBar.setValue((numday+1.0) / all_days * 100)
             curdate = curdate + datetime.timedelta(days=1)
             continue
         for i in xrange(lenres):
@@ -205,13 +209,20 @@ def main_process(code, day_start, day_end, mpf=12, directory=CATLISTDIR, filenam
                 vmag = row['FLUX_V']
                 if (str(vmag)!='--'):
                     for [vml, hdl] in code_table[code]['vphi']:
-                        if vmag < vml:
+                        if vml is None:
+                            if hdist >= hdl:
+                                break
+                            else:
+                                refuse = False
+                                break
+                        elif vmag < vml:
                             if hdist >= hdl:
                                 break
                             else:
                                 refuse = False
                                 break
                 if refuse:
+                    print 'refused: %s' % (row['MAIN_ID'])
                     continue
             
             
@@ -225,7 +236,7 @@ def main_process(code, day_start, day_end, mpf=12, directory=CATLISTDIR, filenam
             for colname in code_table[code]['columns']:
                 locid = ''
                 for an in alt_names:
-                    if an['ID'].startswith(colname.upper()):
+                    if an['ID'].startswith(colname.upper() + ' '):
                         if len(locid) > 0:
                             locid += ' / '
                         lname = an['ID'].replace("NAME", '')
@@ -238,15 +249,21 @@ def main_process(code, day_start, day_end, mpf=12, directory=CATLISTDIR, filenam
             line.append(str(ra))
             line.append(str(dec))
             rowx, colx = write_row(ws, line, rowx, colx)
+            objects_per_day += 1
         curdate = curdate + datetime.timedelta(days=1)
-        rowx, colx = write_row(ws, [''], rowx, colx)
+        if objects_per_day > 0:
+            rowx, colx = write_row(ws, [''], rowx, colx)
         print "Day %d/%d finished" % (numday+1, all_days)
+        if progressBar is not None:
+            progressBar.setValue((numday+1.0) / all_days * 100)
     filename = code.upper() + '_'
     filename += day_start.strftime('%d-%m-%Y')
     filename += '--'
     filename += day_end.strftime('%d-%m-%Y')
     filename += '.xls'
-    wb.save(OUTPUTDIR+filename)
+    full_filename = OUTPUTDIR+filename
+    print full_filename
+    wb.save(full_filename)
     return
     
 if __name__ == '__main__':
