@@ -4,11 +4,14 @@ import shutil
 import os.path
 import datetime
 import csv
+
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QLabel,  QPushButton, QSizePolicy,
     QComboBox, QApplication, QGridLayout, QTableWidget, QTableWidgetItem, QProgressBar,
-    QLineEdit, QFormLayout, QCalendarWidget)
-from PyQt5.QtGui import QValidator
-from PyQt5.QtCore import QBasicTimer, pyqtSlot, QProcess, QObject, pyqtSignal, QThread, QDate
+    QLineEdit, QFormLayout, QCalendarWidget, QFrame, QTableView, QVBoxLayout)
+from PyQt5.QtGui import QValidator, QColor, QTextCharFormat
+from PyQt5.QtCore import QBasicTimer, pyqtSlot, QProcess, QObject, pyqtSignal, QThread, QDate, Qt, QAbstractTableModel
+
+from PyQt5 import QtCore, QtGui
 
 from astrowork import aw_main_process
 import astroquery
@@ -17,6 +20,12 @@ CATLISTDIR = './text/'
 CATLISTFILE = 'catalogue.csv'
 USERPARFILE = 'settings.csv'
 DFLTPARFILE = 'default_parameters.csv'
+
+# http://pyqt.sourceforge.net/Docs/PyQt4/qframe.html#Shadow-enum
+_frameShape = QFrame.WinPanel
+_frameShadow = QFrame.Sunken
+_lineWidth = 3
+_midLineWidth = 3
 
 def removekey(d, key):
     r = dict(d)
@@ -36,7 +45,7 @@ class MainWindow(QMainWindow):
         self.code = self.flist[self.code_int]['code']
         
         self.dictpar = self.load_parameter()
-        tmp_data=self.dictpar[self.code]['vphi']
+        tmp_data = eval(self.dictpar[self.code]['vphi'])
         shape = [2, len(tmp_data)]
         
         self.settings_dirname = './'#CATLISTDIR
@@ -45,23 +54,22 @@ class MainWindow(QMainWindow):
         self.day_end = self.day_start + datetime.timedelta(days=10)
         self.mpf = 12
         
-        chooseCatWgt = ChooseCatalogueList()
-        chooseCatWgt.initUI(self)
+        chooseCatWgt = ChooseCatalogueList(self)
         self.layout.addWidget(chooseCatWgt, 0, 0, 1, 1)
         
         datein = DateInputW(self)
         self.layout.addWidget(datein, 1, 0, 1, 2)
         self.layout.addLayout(datein.layout, 1, 0, 1, 2)
         
-        parameterWgt = ParameterList(self)
-        parameterWgt.makeVmagTable(self, tmp_data, shape)
+        parameterWgt = tableVmag(self, tmp_data, shape)
         self.layout.addWidget(parameterWgt, 0, 1, 1, 1)
+        #self.layout.addLayout(parameterWgt.layout, 0, 1, 1, 1)
         
         mainWork = MainProcess(self)
         self.layout.addWidget(mainWork, 2, 0, 1, 2)
         
-        #self.setLayout(layout)
         self.setGeometry(100, 100, 720, 480)
+        self.setFixedSize(720, 480)
         self.setWindowTitle(u'Соединения Солнца и неподвижных объектов небесной сферы: расчёт')
         self.show()
 
@@ -83,155 +91,39 @@ class MainWindow(QMainWindow):
             for row in fid:
                 dictpar[row['code']] = removekey(row, 'code')
         return dictpar
-        
-class DateInputW(QWidget):
-    def __init__(self, parent):
-        super(DateInputW, self).__init__()
-        
-        self.layout = QGridLayout()
-        self.parent = parent
-        
-        self.title1 = QLabel(u'Начало:', self)
-        self.title1.move(0, 0)
-        self.cal1 = QCalendarWidget()
-        self.cal1.setGridVisible(True)
-        self.cal1.setDateEditEnabled(True)
-
-        self.cal1.clicked.connect(self.setDateStart)
-        self.cal1.setFixedSize(200, 160)
-        ymd1 = [parent.day_start.year, parent.day_start.month, parent.day_start.day]
-        qdate1 = QDate()
-        qdate1.setDate(ymd1[0], ymd1[1], ymd1[2])
-        self.cal1.setSelectedDate(qdate1)
-        
-        self.lbl1 = QLabel(self)
-        self.lbl1.setText(parent.day_start.strftime('%d/%m/%Y'))
-        self.lbl1.move(0, 20)
-        
-        self.title2 = QLabel(u'Конец:', self)
-        self.title2.move(320, 0)
-        self.cal2 = QCalendarWidget()
-        self.cal2.setGridVisible(True)
-        self.cal2.setDateEditEnabled(True)
-
-        self.cal2.clicked.connect(self.setDateEnd)
-        self.cal2.setFixedSize(200, 160)
-        ymd2 = [parent.day_end.year, parent.day_end.month, parent.day_end.day]
-        qdate2 = QDate()
-        qdate2.setDate(ymd2[0], ymd2[1], ymd2[2])
-        self.cal2.setSelectedDate(qdate2)
-        
-        self.lbl2 = QLabel(self)
-        self.lbl2.setText(parent.day_end.strftime('%d/%m/%Y'))
-        self.lbl2.move(320, 20)
-        
-        self.layout.addWidget(self.cal1, 1, 0)
-        self.layout.addWidget(self.cal2, 1, 1)
-        
-       #parent.layout.addLayout(self.layout, 1, 0, 1, 2)
-
-        
-
-        
-    def setDateStart(self):
-        date = self.cal1.selectedDate()
-        date = date.toPyDate()
-        self.parent.day_start = datetime.datetime(date.year, date.month, date.day)
-        self.lbl1.setText(self.parent.day_start.strftime('%d/%m/%Y'))
-
-    def setDateEnd(self):
-        date = self.cal2.selectedDate()
-        date = date.toPyDate()
-        self.parent.day_end = datetime.datetime(date.year, date.month, date.day)
-        self.lbl2.setText(self.parent.day_end.strftime('%d/%m/%Y'))
-        
-
-        
-
-class Worker(QObject):
-    finished = pyqtSignal()
-    message = pyqtSignal(str)
     
-    def __init__(self, parent, pbar):
-        super(Worker, self).__init__()
-        
-        self.parent = parent
-        self.pbar = pbar
+class MyDelegate(QtGui.QItemDelegate):
 
-    @pyqtSlot()
-    def process(self):
-        print 'START'
-        try:
-            aw_main_process(self.parent.code,
-                        self.parent.day_start,
-                        self.parent.day_end,
-                        self.parent.mpf,
-                        directory=self.parent.settings_dirname,
-                        filename=self.parent.settings_filename,
-                        progressBar=self.pbar)
-        except astroquery.exceptions.TimeoutError:
-            self.message.emit('Timeout')
-        finally:
-            self.message.emit('Unknown')
-        print 'FINISHED'
-        self.finished.emit()
+    def __init__(self, parent, table):
+        super(MyDelegate, self).__init__(parent)
+        self.table = table
 
-class MainProcess(QWidget):
-    def __init__(self, parent):
-        super(MainProcess, self).__init__()
-        self.parent = parent
-        self.initUI()
-        
-    def initUI(self):
-        self.pbar = QProgressBar(self)
-        self.pbar.setGeometry(120, 40, 300, 25)
-        
-        self.doing = False
-        self.btn = QPushButton(u'Старт', self)
-        self.btn.move(20, 40)
-        self.btn.clicked.connect(self.doAction)
-        
-    def doAction(self):
-        if not self.doing:
-            self.btn.setText(u'Стоп')
-            self.thread = QThread(self)
-            self.pbar.setValue(0)
-            self.worker = Worker(self.parent, self.pbar)
-            self.worker.moveToThread(self.thread)
-            self.doing = True
-            self.thread.started.connect(self.worker.process)
-            self.worker.finished.connect(self.thread.quit)
-            self.worker.finished.connect(self.worker.deleteLater)
-            self.worker.finished.connect(self.update_button)
-            self.thread.finished.connect(self.thread.deleteLater)
-            self.thread.setTerminationEnabled(True)
-            self.thread.start()
-        else:
-            self.doing = False
-            self.btn.setText(u'Старт')
-            #self.thread.quit()
-            self.thread.setTerminationEnabled(True)
-            self.thread.terminate()
-            
-    def update_button(self):
-        self.doing = False
-        self.btn.setText(u'Старт')
-        
-            
-class tableVmag(QWidget):
-    def __init__(self):
-        super(tableVmag, self).__init__()  
-
-    def makeTable(self, parent, data, shape):
+    def sizeHint(self, option, index):
+        # Get full viewport size
+        table_size = self.table.viewport().size()
+        gw = 1  # Grid line width
+        rows = self.table.rowCount() or 1
+        cols = self.table.columnCount() or 1
+        width = (table_size.width() - (gw * (cols - 1))) / cols
+        height = (table_size.height() -  (gw * (rows - 1))) / rows
+        return QtCore.QSize(width, height)
+    
+class tableVmag(QTableWidget):
+    def __init__(self, parent, data, shape):
         [nrows, ncols] = shape
-        self.tableMaker = QTableWidget(nrows, ncols)
-        self.tableMaker.setVerticalHeaderLabels(['< v (Vmag)', ' < h (dist.)'])
+        super(tableVmag, self).__init__(nrows, ncols)  
+
+        self.setVerticalHeaderLabels(['< v (Vmag)', ' < h (dist.)'])
         for j in xrange(len(data)):
-            self.tableMaker.insertColumn(j)
+            self.insertColumn(j)
             for i in xrange(len(data[j])):
-                self.tableMaker.setItem(i, j, QTableWidgetItem(str(data[j][i])))
-        self.tableMaker.setGeometry(50, 50, 100, 50)
-        return self.tableMaker
+                if data[j][i] is None:
+                    self.setItem(i, j, QTableWidgetItem(''))  
+                else:  
+                    self.setItem(i, j, QTableWidgetItem(str(data[j][i])))
+                    
+        self.resizeColumnsToContents()
+        self.resizeRowsToContents()
 
 class buttonPlusMinus(QWidget):
     def __init__(self):
@@ -241,7 +133,7 @@ class buttonPlusMinus(QWidget):
         buttonMinus = QPushButton('-', parent)
         #testBtn01.move(50, 450)
 
-class ParameterList(QWidget):
+class ParameterList(QFrame):
     def __init__(self, parent):
         super(ParameterList, self).__init__() 
         self.parent = parent
@@ -256,6 +148,15 @@ class ParameterList(QWidget):
         
         
     def initUI(self):
+        self.setAutoFillBackground(True)
+        palette = self.palette()
+        palette.setColor(self.backgroundRole(), QColor('white'))
+        self.setPalette(palette)
+        
+        self.setFrameShape(_frameShape)
+        self.setFrameShadow(_frameShadow)
+        self.setLineWidth(_lineWidth)
+        self.setMidLineWidth(_midLineWidth)
         return    
         combo = QComboBox(self)
         
@@ -277,14 +178,253 @@ class ParameterList(QWidget):
         #self.setGeometry(300, 300, 400, 200)
         #self.setWindowTitle(u'Выбор каталога')
         #self.show()
+            
+        
+class Table(QWidget):
+    def __init__(self, parent):
+        super(Table, self).__init__()
+        self.parent = parent
+        
+        tablemodel = TableModel(self.parent.dictpar[self.parent.code]['vphi'], self)
+        tableview = QTableView()
+        tableview.setModel(tablemodel)
+        
+        #self.layout = QVBoxLayout(self)
+        #self.layout.addWidget(tableview)
+        #self.setLayout(self.layout)
+        
+    def columnCount(self, parent):
+        return len(self.arraydata)
+
+    def data(self, index, role):
+        if not index.isValid():
+            return None
+        elif role != Qt.DisplayRole:
+            return None
+        return (self.arraydata[index.column()][index.row()])
+        
+class TableModel(QAbstractTableModel):
+    def __init__(self, datain, parent = None, *args):
+        QAbstractTableModel.__init__(self, parent, *args)
+        self.arraydata = datain
+
+    def columnCount(self, parent):
+        return len(self.arraydata)
+
+    def data(self, index, role):
+        if not index.isValid():
+            return None
+        elif role != Qt.DisplayRole:
+            return None
+        return (self.arraydata[index.column()][index.row()])
+        
+class DateInputW(QFrame):
+    def __init__(self, parent):
+        super(DateInputW, self).__init__()
+        
+        self.layout = QGridLayout()
+        self.parent = parent
+        
+        self.title1 = QLabel(u'Начало:', self)
+        self.title1.move(5, 5)
+        self.cal1 = QCalendarWidget()
+        self.cal1.setGridVisible(True)
+        self.cal1.setDateEditEnabled(True)
+
+        self.cal1.clicked.connect(self.setDateStart)
+        self.cal1.setFixedSize(200, 160)
+        ymd1 = [parent.day_start.year, parent.day_start.month, parent.day_start.day]
+        qdate1 = QDate()
+        qdate1.setDate(ymd1[0], ymd1[1], ymd1[2])
+        self.cal1.setSelectedDate(qdate1)
+        
+        self.lbl1 = QLabel(self)
+        self.lbl1.setText(parent.day_start.strftime('%d/%m/%Y'))
+        self.lbl1.move(5, 25)
+        
+        self.title2 = QLabel(u'Конец:', self)
+        self.title2.move(325, 5)
+        self.cal2 = QCalendarWidget()
+        self.cal2.setGridVisible(True)
+        self.cal2.setDateEditEnabled(True)
+
+        self.cal2.clicked.connect(self.setDateEnd)
+        self.cal2.setFixedSize(200, 160)
+        ymd2 = [parent.day_end.year, parent.day_end.month, parent.day_end.day]
+        qdate2 = QDate()
+        qdate2.setDate(ymd2[0], ymd2[1], ymd2[2])
+        self.cal2.setSelectedDate(qdate2)
+        
+        self.lbl2 = QLabel(self)
+        self.lbl2.setText(parent.day_end.strftime('%d/%m/%Y'))
+        self.lbl2.move(325, 25)
+        
+        self.layout.addWidget(self.cal1, 1, 0)
+        self.layout.addWidget(self.cal2, 1, 1)
+        
+        self.setAutoFillBackground(True)
+        palette = self.palette()
+        palette.setColor(self.backgroundRole(), QColor('white'))
+        self.setPalette(palette)
+        
+        self.setFrameShape(_frameShape)
+        self.setFrameShadow(_frameShadow)
+        self.setLineWidth(_lineWidth)
+        self.setMidLineWidth(_midLineWidth)
+        
+        #change NavBar background color
+        child = self.cal1.children()[3]
+        palette = child.palette()
+        palette.setColor(child.backgroundRole(), QColor('silver'))
+        child.setPalette(palette)
+        
+        child = self.cal2.children()[3]
+        palette = child.palette()
+        palette.setColor(child.backgroundRole(), QColor('silver'))
+        child.setPalette(palette)
+        
+        # change cell color
+        brush = self.cal1.paintCell
+        
+        
+        #self.cal1.setWeekdayTextFormat(headerForm)
+        
+       #parent.layout.addLayout(self.layout, 1, 0, 1, 2)
+
         
 
+        
+    def setDateStart(self):
+        date = self.cal1.selectedDate()
+        date = date.toPyDate()
+        self.parent.day_start = datetime.datetime(date.year, date.month, date.day)
+        self.lbl1.setText(self.parent.day_start.strftime('%d/%m/%Y'))
+        
+        minDate_dt = self.parent.day_start + datetime.timedelta(days=1)
+        minDate = QDate()
+        minDate.setDate(minDate_dt.year, minDate_dt.month, minDate_dt.day)
+        self.cal2.setMinimumDate(minDate)
 
-class ChooseCatalogueList(QWidget):
+    def setDateEnd(self):
+        date = self.cal2.selectedDate()
+        date = date.toPyDate()
+        self.parent.day_end = datetime.datetime(date.year, date.month, date.day)
+        self.lbl2.setText(self.parent.day_end.strftime('%d/%m/%Y'))
+        
+        maxDate_dt = self.parent.day_end - datetime.timedelta(days=1)
+        maxDate = QDate()
+        maxDate.setDate(maxDate_dt.year, maxDate_dt.month, maxDate_dt.day)
+        self.cal1.setMaximumDate(maxDate)
+        
+
+class Worker(QObject):
+    finished = pyqtSignal()
+    stoping = pyqtSignal()
+    #message = pyqtSignal(str)
     
     def __init__(self):
+        super(Worker, self).__init__()
+
+    @pyqtSlot(object, object)
+    def process(self, parent, pbar):
+        print 'START'
+        try:
+            aw_main_process(parent.code,
+                        parent.day_start,
+                        parent.day_end,
+                        parent.mpf,
+                        directory=parent.settings_dirname,
+                        filename=parent.settings_filename,
+                        progressBar=pbar)
+        except astroquery.exceptions.TimeoutError:
+            #self.message.emit('Timeout')
+            pass
+        except KeyboardInterrupt:
+            pass
+        finally:
+            #self.message.emit('Unknown')
+            pass
+        print 'FINISHED'
+        self.finished.emit()
+        
+    @pyqtSlot()
+    def stop(self):
+        self.stoping.emit()
+
+class MyThread(QThread):
+    def __init__(self):
+        super(MyThread, self).__init__() 
+        self.setTerminationEnabled(True)
+       
+        
+
+class MainProcess(QFrame):
+    def __init__(self, parent):
+        super(MainProcess, self).__init__()
+        self.parent = parent
+        self.initUI()
+        
+    def initUI(self):
+        self.pbar = QProgressBar(self)
+        self.pbar.setGeometry(120, 40, 300, 25)
+        
+        self.doing = False
+        self.btn = QPushButton(u'Старт', self)
+        self.btn.move(20, 40)
+        self.btn.clicked.connect(self.doAction)
+        
+        self.setAutoFillBackground(True)
+        palette = self.palette()
+        palette.setColor(self.backgroundRole(), QColor('white'))
+        self.setPalette(palette)
+        
+        self.setFrameShape(_frameShape)
+        self.setFrameShadow(_frameShadow)
+        self.setLineWidth(_lineWidth)
+        self.setMidLineWidth(_midLineWidth)
+        
+    def doAction(self):
+        if not self.doing:
+            self.btn.setText(u'Стоп')
+            self.thread = MyThread()
+            self.pbar.setValue(0)
+            self.worker = Worker()
+            self.worker.moveToThread(self.thread)
+            self.doing = True
+            #self.thread.started.connect(self.worker.process)#worker.process)
+            self.worker.finished.connect(self.thread.quit)
+            #self.worker.finished.connect(self.worker.deleteLater)
+            #self.worker.finished.connect(self.update_button)
+            self.thread.finished.connect(self.update_button)
+            #self.worker.stoping.connect(self.thread.terminate)
+            #self.btn.clicked.connect(self.worker.stop)
+            QtCore.QMetaObject.invokeMethod(self.worker, 'process', Qt.QueuedConnection,
+                                            QtCore.Q_ARG(object, self.parent),
+                                            QtCore.Q_ARG(object, self.pbar))
+                                            
+            self.thread.start()
+        else:
+            #self.doing = False
+            #self.btn.setText(u'Старт')
+            self.thread.terminate()
+            #self.pbar.setValue(0)
+            pass
+
+            
+    def update_button(self):
+        self.doing = False
+        self.btn.setText(u'Старт')
+        self.pbar.setValue(0)
+        
+            
+
+
+
+class ChooseCatalogueList(QFrame):
+    
+    def __init__(self, parent):
         super(ChooseCatalogueList, self).__init__() 
-        #self.initUI()
+        self.initUI(parent)
         
         
         #ChooseCatalogueList()
@@ -303,7 +443,7 @@ class ChooseCatalogueList(QWidget):
             combo.addItem(x['name'])
         
         combo.move(50, 50)
-        self.title.move(0, 20)
+        self.title.move(5, 25)
         self.lbl.move(50, 100)
         self.descr.move(150, 50)
         
@@ -311,7 +451,16 @@ class ChooseCatalogueList(QWidget):
             return self.onActivated(parent, ind)
 
         combo.activated[int].connect(onact) 
+        
+        self.setAutoFillBackground(True)
+        palette = self.palette()
+        palette.setColor(self.backgroundRole(), QColor('white'))
+        self.setPalette(palette)
          
+        self.setFrameShape(_frameShape)
+        self.setFrameShadow(_frameShadow)
+        self.setLineWidth(_lineWidth)
+        self.setMidLineWidth(_midLineWidth)
         #self.setGeometry(300, 300, 400, 200)
         #self.setWindowTitle(u'Выбор каталога')
         #self.show()
