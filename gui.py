@@ -7,7 +7,8 @@ import csv
 
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QLabel,  QPushButton, QSizePolicy,
     QComboBox, QApplication, QGridLayout, QTableWidget, QTableWidgetItem, QProgressBar,
-    QLineEdit, QFormLayout, QCalendarWidget, QFrame, QTableView, QVBoxLayout)
+    QLineEdit, QFormLayout, QCalendarWidget, QFrame, QTableView, QVBoxLayout, QHeaderView,
+    QAbstractItemView)
 from PyQt5.QtGui import QValidator, QColor, QTextCharFormat
 from PyQt5.QtCore import QBasicTimer, pyqtSlot, QProcess, QObject, pyqtSignal, QThread, QDate, Qt, QAbstractTableModel
 
@@ -32,6 +33,43 @@ def removekey(d, key):
     del r[key]
     return r
 
+def checkVmag(data):
+    cols = len(data)
+    if cols == 0:
+        return -1
+    [x, y] = data[0]
+    for i in xrange(cols):
+        if len(data[i]) != 2:
+            return -1
+        if not isinstance(data[i][1], (int, float)):
+            return -1
+        if (cols == 1) or (i == cols-1):
+            if data[i][0] is not None:
+                return -1
+        else:
+            if data[i][0] <= x:
+                return -1
+            if dara[i][1] >= y:
+                return -1
+        [x, y] = data[i]
+    return 0
+            
+def saveVmag(data):
+    lst = []
+    with open(USERPARFILE, 'rb') as csvfile:
+        fid = csv.DictReader(csvfile, delimiter=',', quotechar="'")
+        for row in fid:
+            row['vphi'] = str(data[row['code']]['vphi'])
+            lst.append(row)
+    with open(USERPARFILE, 'w') as csvfile:
+        fields = lst[0].keys()
+        writer = csv.DictWriter(csvfile, fieldnames=fields, delimiter=',', quotechar="'")
+        writer.writeheader()
+        for row in lst:
+            writer.writerow(row)
+    return
+    
+
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__()
@@ -45,13 +83,11 @@ class MainWindow(QMainWindow):
         self.code = self.flist[self.code_int]['code']
         
         self.dictpar = self.load_parameter()
-        tmp_data = eval(self.dictpar[self.code]['vphi'])
-        shape = [2, len(tmp_data)]
         
         self.settings_dirname = './'#CATLISTDIR
         self.settings_filename = USERPARFILE
         self.day_start = datetime.datetime.today()
-        self.day_end = self.day_start + datetime.timedelta(days=10)
+        self.day_end = self.day_start + datetime.timedelta(days=1)
         self.mpf = 12
         
         chooseCatWgt = ChooseCatalogueList(self)
@@ -61,9 +97,11 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(datein, 1, 0, 1, 2)
         self.layout.addLayout(datein.layout, 1, 0, 1, 2)
         
-        parameterWgt = tableVmag(self, tmp_data, shape)
+        parameterWgt = ParameterList(self)
+        parameterWgt.makeTable()
         self.layout.addWidget(parameterWgt, 0, 1, 1, 1)
-        #self.layout.addLayout(parameterWgt.layout, 0, 1, 1, 1)
+        self.layout.addLayout(parameterWgt.layout, 0, 1, 1, 1)
+        chooseCatWgt.connectExt(parameterWgt.tableVmag.updateInd)
         
         mainWork = MainProcess(self)
         self.layout.addWidget(mainWork, 2, 0, 1, 2)
@@ -92,46 +130,47 @@ class MainWindow(QMainWindow):
                 dictpar[row['code']] = removekey(row, 'code')
         return dictpar
     
-class MyDelegate(QtGui.QItemDelegate):
-
-    def __init__(self, parent, table):
-        super(MyDelegate, self).__init__(parent)
-        self.table = table
-
-    def sizeHint(self, option, index):
-        # Get full viewport size
-        table_size = self.table.viewport().size()
-        gw = 1  # Grid line width
-        rows = self.table.rowCount() or 1
-        cols = self.table.columnCount() or 1
-        width = (table_size.width() - (gw * (cols - 1))) / cols
-        height = (table_size.height() -  (gw * (rows - 1))) / rows
-        return QtCore.QSize(width, height)
-    
 class tableVmag(QTableWidget):
-    def __init__(self, parent, data, shape):
-        [nrows, ncols] = shape
-        super(tableVmag, self).__init__(nrows, ncols)  
+    def __init__(self, parent):
+        super(tableVmag, self).__init__()  
 
-        self.setVerticalHeaderLabels(['< v (Vmag)', ' < h (dist.)'])
+        self.parent = parent
+        minpol = QSizePolicy.Minimum
+        self.setSizePolicy(minpol, minpol)
+        self.setEditTriggers(QAbstractItemView.CurrentChanged)
+        
+    def fillTable(self, data):
+        self.setRowCount(2)
+        self.setColumnCount(0)
+        ncols = len(data)
+
+        self.setVerticalHeaderLabels(['Vmag', 'Dist.'])
+        if ncols == 1:
+            cont = u'<Не учитывается>'
+    
         for j in xrange(len(data)):
             self.insertColumn(j)
             for i in xrange(len(data[j])):
                 if data[j][i] is None:
-                    self.setItem(i, j, QTableWidgetItem(''))  
+                    if ncols == 1:
+                        content = u'<Не учитывается>'
+                    else:
+                        content = '> ' + str(data[j-1][i])
+                    self.setItem(i, j, QTableWidgetItem(content))  
                 else:  
                     self.setItem(i, j, QTableWidgetItem(str(data[j][i])))
                     
         self.resizeColumnsToContents()
         self.resizeRowsToContents()
-
-class buttonPlusMinus(QWidget):
-    def __init__(self):
-        super(buttonPlusMinus, self).__init__()
-    def makeButton(self, parent):
-        buttonPlus = QPushButton('+', parent)
-        buttonMinus = QPushButton('-', parent)
-        #testBtn01.move(50, 450)
+        vertheader = self.verticalHeader()
+        vertheader.setSectionResizeMode(QHeaderView.Stretch)
+        horheader = self.horizontalHeader()
+        horheader.setSectionResizeMode(QHeaderView.Stretch)
+        
+    def updateInd(self, ind):
+        code = self.parent.flist[ind]['code']
+        data = eval(self.parent.dictpar[code]['vphi'])
+        self.fillTable(data)
 
 class ParameterList(QFrame):
     def __init__(self, parent):
@@ -139,15 +178,26 @@ class ParameterList(QFrame):
         self.parent = parent
         self.initUI()
         
-    def makeVmagTable(self, parent, data, shape):
-        self.tableVmag = tableVmag()
-        self.readyTable = self.tableVmag.makeTable(parent, data, shape)
         
-        buttonParent = buttonPlusMinus()
-        buttonParent.makeButton(self)
+    def makeButton(self):
+        self.btn = QPushButton(u'Сохранить настройки', self)
+        self.layout.addWidget(self.btn)
+        
+    def makeTable(self):
+        self.tableVmag = tableVmag(self.parent)
+        self.tableVmag.updateInd(self.parent.code_int)
+        self.tableVmag.setFixedSize(345, 100)
+        self.layout.addWidget(self.tableVmag)
+        
+        self.makeButton()
+        #buttonParent = buttonPlusMinus()
+        #buttonParent.makeButton(self)
         
         
     def initUI(self):
+        self.layout = QVBoxLayout()
+
+    
         self.setAutoFillBackground(True)
         palette = self.palette()
         palette.setColor(self.backgroundRole(), QColor('white'))
@@ -179,44 +229,7 @@ class ParameterList(QFrame):
         #self.setWindowTitle(u'Выбор каталога')
         #self.show()
             
-        
-class Table(QWidget):
-    def __init__(self, parent):
-        super(Table, self).__init__()
-        self.parent = parent
-        
-        tablemodel = TableModel(self.parent.dictpar[self.parent.code]['vphi'], self)
-        tableview = QTableView()
-        tableview.setModel(tablemodel)
-        
-        #self.layout = QVBoxLayout(self)
-        #self.layout.addWidget(tableview)
-        #self.setLayout(self.layout)
-        
-    def columnCount(self, parent):
-        return len(self.arraydata)
 
-    def data(self, index, role):
-        if not index.isValid():
-            return None
-        elif role != Qt.DisplayRole:
-            return None
-        return (self.arraydata[index.column()][index.row()])
-        
-class TableModel(QAbstractTableModel):
-    def __init__(self, datain, parent = None, *args):
-        QAbstractTableModel.__init__(self, parent, *args)
-        self.arraydata = datain
-
-    def columnCount(self, parent):
-        return len(self.arraydata)
-
-    def data(self, index, role):
-        if not index.isValid():
-            return None
-        elif role != Qt.DisplayRole:
-            return None
-        return (self.arraydata[index.column()][index.row()])
         
 class DateInputW(QFrame):
     def __init__(self, parent):
@@ -290,10 +303,7 @@ class DateInputW(QFrame):
         #self.cal1.setWeekdayTextFormat(headerForm)
         
        #parent.layout.addLayout(self.layout, 1, 0, 1, 2)
-
-        
-
-        
+   
     def setDateStart(self):
         date = self.cal1.selectedDate()
         date = date.toPyDate()
@@ -366,7 +376,7 @@ class MainProcess(QFrame):
         
     def initUI(self):
         self.pbar = QProgressBar(self)
-        self.pbar.setGeometry(120, 40, 300, 25)
+        self.pbar.setGeometry(120, 40, 550, 25)
         
         self.doing = False
         self.btn = QPushButton(u'Старт', self)
@@ -431,7 +441,7 @@ class ChooseCatalogueList(QFrame):
         
         
     def initUI(self, parent):    
-        combo = QComboBox(self)
+        self.combo = QComboBox(self)
         self.title = QLabel(u'Выбор каталога:', self)
         self.lbl = QLabel('', self)
         self.descr = QLabel('', self)
@@ -440,9 +450,9 @@ class ChooseCatalogueList(QFrame):
         self.onActivated(parent, parent.code_int)
 
         for x in parent.flist:
-            combo.addItem(x['name'])
+            self.combo.addItem(x['name'])
         
-        combo.move(50, 50)
+        self.combo.move(50, 50)
         self.title.move(5, 25)
         self.lbl.move(50, 100)
         self.descr.move(150, 50)
@@ -450,7 +460,7 @@ class ChooseCatalogueList(QFrame):
         def onact(ind):
             return self.onActivated(parent, ind)
 
-        combo.activated[int].connect(onact) 
+        self.combo.activated[int].connect(onact) 
         
         self.setAutoFillBackground(True)
         palette = self.palette()
@@ -461,6 +471,8 @@ class ChooseCatalogueList(QFrame):
         self.setFrameShadow(_frameShadow)
         self.setLineWidth(_lineWidth)
         self.setMidLineWidth(_midLineWidth)
+        
+        self.setFixedSize(350, 120)
         #self.setGeometry(300, 300, 400, 200)
         #self.setWindowTitle(u'Выбор каталога')
         #self.show()
@@ -476,6 +488,9 @@ class ChooseCatalogueList(QFrame):
         
         parent.code_int = ind
         parent.code = parent.flist[ind]['code']
+        
+    def connectExt(self, fun):
+        self.combo.activated[int].connect(fun)
 
 
 if __name__ == '__main__':

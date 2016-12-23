@@ -1,5 +1,5 @@
 code,vphi,columns,use_name
-'aco','[[None,30]]','ngc|m',0
+'aco','[[None,30]]','',0
 'gcl','[[None,20]]','ngc|m',1
 'hh','[[None,3]]','ngc|m',0
 'hip','[[3,17],[4,15],[5,14],[6,13],[7,12],[8,8],[9,4],[11,2],[None,1]]','hd|*',1

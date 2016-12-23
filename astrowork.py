@@ -89,6 +89,8 @@ def make_list_header(ws, code, code_table):
     for x in base:
         ws.write(rowx, colx, x.decode('utf8'), style=style)
         colx += 1
+    ws.write(rowx, colx, 'Code'.decode('utf8'), style=style)
+    colx += 1
     if code_table[code]['use_name']:
         ws.write(rowx, colx, 'Name'.decode('utf8'), style=style)
         colx += 1
@@ -227,20 +229,24 @@ def aw_main_process(code, day_start, day_end, mpf=12,
             
             
             line = [curdate.strftime('%d/%m/%Y'), t.__str__(rpar=0)]
-            name = row['MAIN_ID']
-            if code_table[code]['use_name']:
-                if name.startswith('NAME '):
-                    name = name.replace("NAME ", '')
-                line.append(name)
+            mainid = row['MAIN_ID']
+            line.append(mainid)
             alt_names = Simbad.query_objectids(row['MAIN_ID'])
+            if code_table[code]['use_name']:
+                lname = ''
+                for an in alt_names:
+                    if an['ID'].startswith('NAME '):
+                        if len(lname) > 0:
+                            lname += ' / '
+                        lname += an['ID'].replace("NAME ", '')
+                line.append(lname)
             for colname in code_table[code]['columns']:
                 locid = ''
                 for an in alt_names:
                     if an['ID'].startswith(colname.upper() + ' '):
                         if len(locid) > 0:
                             locid += ' / '
-                        lname = an['ID'].replace("NAME", '')
-                        locid = locid + lname.replace("*", "") 
+                        locid = locid + an['ID'].replace("*", "") 
                 line.append(locid)
             if code_table[code]['phi_vec']:
                 line.append(str(row['FLUX_V']))
