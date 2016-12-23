@@ -110,7 +110,10 @@ def make_list_header(ws, code, code_table):
     
 def formulate_query(code, ra_interest, dec_interest):
     query = "cat in ('" + code + "')" + ' & '
-    query += 'rah >= '+ str(ra_interest[0])  + ' & ' + 'rah < ' + str(ra_interest[1])+ ' & '
+    if ra_interest[0] < ra_interest[1]:
+        query += '(rah >= '+ str(ra_interest[0])  + ' & ' + 'rah < ' + str(ra_interest[1])+ ') & '
+    else:
+        query += '(rah >= '+ str(ra_interest[0])  + ' | ' + 'rah < ' + str(ra_interest[1])+ ') & '
     query += 'dec > '+ str(dec_interest[0]) + ' & ' + 'dec < ' + str(dec_interest[1])
     return query
 
