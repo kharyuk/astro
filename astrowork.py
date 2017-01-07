@@ -1,5 +1,6 @@
-from astroquery.simbad import Simbad
+#from astroquery.simbad import Simbad
 from compute import *
+from simbad_query import Simbad
 from utils import parse_date, parse_coord
 import time
 import ephem
@@ -7,16 +8,12 @@ import datetime
 from utils import parse_coord
 import xlwt
 import csv
+import os
 
 CATLISTDIR = './text/'
 CATLISTFILE = 'catalogue.csv'
 OUTPUTDIR = './result/'
 DEFAULTSETTINGSFILE = 'default_parameters.csv'
-
-import six
-import packaging
-import packaging.version
-import packaging.specifiers
 
 
 def ephsun(date):
@@ -129,6 +126,16 @@ def aw_main_process(code, day_start, day_end, mpf=12,
                                            directory=CATLISTDIR,
                                            filename=DEFAULTSETTINGSFILE,
                                            progressBar=None):
+    exists = os.path.isdir(OUTPUTDIR)
+    if not exists:
+        os.mkdir(OUTPUTDIR)
+    
+    exists = os.path.isdir(directory)
+    exists = exists and os.path.isfile(directory+filename)
+    if not exists:
+        print "No directory (or file) with default_settigs"
+    
+    
     style_string = "font: bold on"
     style = xlwt.easyxf(style_string)
     
@@ -145,10 +152,12 @@ def aw_main_process(code, day_start, day_end, mpf=12,
     
     customSimbad = Simbad()
     if len(code_table[code]['columns']) > 0:
-        customSimbad.add_votable_fields('id('+code+')')
+        customSimbad.addVotField('id('+code+')')
+        #customSimbad.add_votable_fields('id('+code+')')
     if code_table[code]['phi_vec']:
-        customSimbad.add_votable_fields('flux(V)')
-    customSimbad.ROW_LIMIT = -1
+        customSimbad.addVotField('flux(V)')
+        #customSimbad.add_votable_fields('flux(V)')
+    #customSimbad.ROW_LIMIT = -1
     #additionalSimbad = {}
     #for x in code_table[code]['columns']:
     #    additionalSimbad[x] = Simbad()
@@ -189,19 +198,21 @@ def aw_main_process(code, day_start, day_end, mpf=12,
         result = customSimbad.query_criteria(query)
         if result is not None:
             lenres = len(result)
-            result.sort('RA')
+            #result.sort('RA')
         else:
             print "Day %d/%d finished w/o output" % (numday+1, all_days)
             if progressBar is not None:
                 progressBar.setValue((numday+1.0) / all_days * 100)
             curdate = curdate + datetime.timedelta(days=1)
             continue
+        lines = []
         for i in xrange(lenres):
             row = result[i]
             [ra, dec] = [row['RA'], row['DEC']]
 
             ra = parse_coord( ra, 'ra', ' ')
             dec = parse_coord( dec, 'deg', ' ')
+
             try:
                 t = comp_time(ra1, ra2, ra)
             except:
@@ -234,22 +245,27 @@ def aw_main_process(code, day_start, day_end, mpf=12,
             line = [curdate.strftime('%d/%m/%Y'), t.__str__(rpar=0)]
             mainid = row['MAIN_ID']
             line.append(mainid)
-            alt_names = Simbad.query_objectids(row['MAIN_ID'])
+            #alt_names = Simbad.query_objectids(row['MAIN_ID'])
+            alt_names = customSimbad.query_object_ids(row['MAIN_ID'])
             if code_table[code]['use_name']:
                 lname = ''
                 for an in alt_names:
-                    if an['ID'].startswith('NAME '):
+                    #if an['ID'].startswith('NAME '):
+                    if an.startswith('NAME '):
                         if len(lname) > 0:
                             lname += ' / '
-                        lname += an['ID'].replace("NAME ", '')
+                        #lname += an['ID'].replace("NAME ", '')
+                        lname += an.replace("NAME ", '')
                 line.append(lname)
             for colname in code_table[code]['columns']:
                 locid = ''
                 for an in alt_names:
-                    if an['ID'].startswith(colname.upper() + ' '):
+                    #if an['ID'].startswith(colname.upper() + ' '):
+                    if an.startswith(colname.upper() + ' '):
                         if len(locid) > 0:
                             locid += ' / '
-                        locid = locid + an['ID'].replace("*", "") 
+                        #locid = locid + an['ID'].replace("*", "") 
+                        locid = locid + an.replace("*", "") 
                 line.append(locid)
             if code_table[code]['phi_vec']:
                 line.append(str(row['FLUX_V']))
@@ -257,10 +273,13 @@ def aw_main_process(code, day_start, day_end, mpf=12,
             line.append(str(dist))
             line.append(str(ra))
             line.append(str(dec))
-            rowx, colx = write_row(ws, line, rowx, colx)
+            lines.append(line)
             objects_per_day += 1
         curdate = curdate + datetime.timedelta(days=1)
         if objects_per_day > 0:
+            lines = sorted(lines, key=lambda x: x[1])
+            for line in lines:
+                rowx, colx = write_row(ws, line, rowx, colx)
             rowx, colx = write_row(ws, [''], rowx, colx)
         print "Day %d/%d finished" % (numday+1, all_days)
         if progressBar is not None:
@@ -277,5 +296,5 @@ def aw_main_process(code, day_start, day_end, mpf=12,
     
 if __name__ == '__main__':
     d1 = datetime.datetime.strptime('01/04/2016', '%d/%m/%Y')
-    d2 = datetime.datetime.strptime('01/04/2018', '%d/%m/%Y')
-    main_process('gcl', d1, d2)
+    d2 = datetime.datetime.strptime('01/05/2016', '%d/%m/%Y')
+    aw_main_process('gcl', d1, d2)

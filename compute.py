@@ -1,7 +1,7 @@
 import numpy as np
 from coord import coord
 
-star_day = 60*60*24#86164.090530833 #seconds
+star_day = 60.*60.*24.#86164.090530833 #seconds
     
 def sundec(N):
     tmp = np.sin(-23.44 * np.pi / 180)
@@ -42,12 +42,22 @@ def comp_time(sun1, sun2, star):
     st = star.f2s()
     s1 = sun1.f2s()
     s2 = sun2.f2s()
+    
+    if s2 < s1:
+        d1 = abs(s1 - st)
+        d2 = abs(s2 - st)
+        if d1 > d2:
+            s1 -= star_day
+        elif d2 > d1:
+            s2 += star_day
+    
     assert (st >= s1) and (s2 > st), 'Object is not in interval'
-    ds = sun2 - sun1
-    point = star - sun1 # intersection path
-    pra = point.f2s() # path in seconds
+    ds = s2 - s1 # sun2 - sun1
+    pra = st - s1 # point = star - sun1 # intersection path
+    #pra = point.f2s() # path in seconds
     vra = ds / star_day # velocity
     t = coord(0, 0, pra / vra)# time of intersection
+    #print s1, st, s2, ds, pra, vra, t
     return t
 
 def comp_dist(day, mon, time, obj_dec):

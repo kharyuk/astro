@@ -1,0 +1,7 @@
+from cx_Freeze import setup, Executable
+
+setup(
+    name = "",
+    version = "0.1",
+    description = "Astro tool",
+    executables = [Executable(script = "gui.py", base = "win32")])

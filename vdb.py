@@ -4,6 +4,9 @@ from astroquery.vizier import Vizier
 from compute import *
 from utils import parse_date, parse_coord
 
+# catalogues ['V/50', 'VII/239A/icpos']
+
+
 def process_vdb(vdbname, gfields, sun, ind, ra_interest, dec_interest, print_coord = True, print_head = True):
     
     lcol = 12

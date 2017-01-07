@@ -6,16 +6,25 @@ import datetime
 import csv
 
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QLabel,  QPushButton, QSizePolicy,
-    QComboBox, QApplication, QGridLayout, QTableWidget, QTableWidgetItem, QProgressBar,
-    QLineEdit, QFormLayout, QCalendarWidget, QFrame, QTableView, QVBoxLayout, QHeaderView,
-    QAbstractItemView)
-from PyQt5.QtGui import QValidator, QColor, QTextCharFormat
-from PyQt5.QtCore import QBasicTimer, pyqtSlot, QProcess, QObject, pyqtSignal, QThread, QDate, Qt, QAbstractTableModel
+    QComboBox, QApplication, QGridLayout, QProgressBar,
+    QCalendarWidget, QFrame, QTableView, QVBoxLayout, QHeaderView, QHBoxLayout)
+from PyQt5.QtGui import QColor, QStandardItemModel, QStandardItem
+from PyQt5.QtCore import (pyqtSlot, QObject, pyqtSignal, QThread, QDate, Qt,
+                           QModelIndex, Q_ARG, QMetaObject)
 
-from PyQt5 import QtCore, QtGui
 
 from astrowork import aw_main_process
-import astroquery
+#import astroquery
+
+
+import appdirs
+import six
+import packaging
+import packaging.version
+import packaging.specifiers
+import packaging.requirements
+
+
 
 CATLISTDIR = './text/'
 CATLISTFILE = 'catalogue.csv'
@@ -98,10 +107,9 @@ class MainWindow(QMainWindow):
         self.layout.addLayout(datein.layout, 1, 0, 1, 2)
         
         parameterWgt = ParameterList(self)
-        parameterWgt.makeTable()
         self.layout.addWidget(parameterWgt, 0, 1, 1, 1)
         self.layout.addLayout(parameterWgt.layout, 0, 1, 1, 1)
-        chooseCatWgt.connectExt(parameterWgt.tableVmag.updateInd)
+        chooseCatWgt.connectExt(parameterWgt.updateInd)
         
         mainWork = MainProcess(self)
         self.layout.addWidget(mainWork, 2, 0, 1, 2)
@@ -129,75 +137,183 @@ class MainWindow(QMainWindow):
             for row in fid:
                 dictpar[row['code']] = removekey(row, 'code')
         return dictpar
-    
-class tableVmag(QTableWidget):
-    def __init__(self, parent):
-        super(tableVmag, self).__init__()  
-
-        self.parent = parent
-        minpol = QSizePolicy.Minimum
-        self.setSizePolicy(minpol, minpol)
-        self.setEditTriggers(QAbstractItemView.CurrentChanged)
         
-    def fillTable(self, data):
-        self.setRowCount(2)
-        self.setColumnCount(0)
+    def save_parameter(self, data):
+        print 'SAVING...'
+        print 'Not Implemented'
+        lst = []
+        ind = self.code_int
+        code = self.flist[ind]['code']
+        with open(USERPARFILE, 'rb') as csvfile:
+            fid = csv.DictReader(csvfile, delimiter=',', quotechar="'")
+            for row in fid:
+                if row['code'] == code:
+                    row['vphi'] = str(data)
+                lst.append(row)
+        with open(USERPARFILE, 'w') as csvfile:
+            fields = lst[0].keys()
+            writer = csv.DictWriter(csvfile, fieldnames=fields, delimiter=',', quotechar="'")
+            writer.writeheader()
+            for row in lst:
+                writer.writerow(row)
+        
+        return
         ncols = len(data)
-
-        self.setVerticalHeaderLabels(['Vmag', 'Dist.'])
-        if ncols == 1:
-            cont = u'<Не учитывается>'
-    
-        for j in xrange(len(data)):
-            self.insertColumn(j)
-            for i in xrange(len(data[j])):
-                if data[j][i] is None:
-                    if ncols == 1:
-                        content = u'<Не учитывается>'
-                    else:
-                        content = '> ' + str(data[j-1][i])
-                    self.setItem(i, j, QTableWidgetItem(content))  
-                else:  
-                    self.setItem(i, j, QTableWidgetItem(str(data[j][i])))
-                    
-        self.resizeColumnsToContents()
-        self.resizeRowsToContents()
-        vertheader = self.verticalHeader()
-        vertheader.setSectionResizeMode(QHeaderView.Stretch)
-        horheader = self.horizontalHeader()
-        horheader.setSectionResizeMode(QHeaderView.Stretch)
-        
-    def updateInd(self, ind):
-        code = self.parent.flist[ind]['code']
-        data = eval(self.parent.dictpar[code]['vphi'])
-        self.fillTable(data)
-
+        nrows = 2
+        assert len(data[0]) == nrows
+        for j in xrange(ncols):
+            if j > 0:
+                if j == ncols-1:
+                    if data[j][0] is not None:
+                        data[j][0] = None
+                else:
+                    if data[j][0] is None:
+                        ncols = j+1
+                        data = data[:j+1]
+                        data[j][0] = None
+                    current = [float(data[j][0]), float(data[j][1]) ]
+                    if pred[0] >= current[0]:
+                        ncols = j+1
+                        data = data[:j+1]
+                        data[j][0] = None
+                    if pred[1] <= current[1]:
+                        ncols = j
+                        data = data[:j]
 class ParameterList(QFrame):
     def __init__(self, parent):
         super(ParameterList, self).__init__() 
         self.parent = parent
         self.initUI()
+        self.makeTable()
+        self.makeButtons()
         
+    def makeButtons(self):
+        self.btn1 = QPushButton(u'Сохранить настройки', self)
+        self.connectSave()
+        self.btn2 = QPushButton(' + ', self)
+        self.connectPlus()
+        self.btn3 = QPushButton(' - ', self)
+        self.connectMinus()
         
-    def makeButton(self):
-        self.btn = QPushButton(u'Сохранить настройки', self)
-        self.layout.addWidget(self.btn)
+        self.dLayout.addWidget(self.btn1)
+        self.dLayout.addWidget(self.btn2)
+        self.dLayout.addWidget(self.btn3)
+        
+        self.layout.addLayout(self.dLayout)
         
     def makeTable(self):
-        self.tableVmag = tableVmag(self.parent)
-        self.tableVmag.updateInd(self.parent.code_int)
-        self.tableVmag.setFixedSize(345, 100)
-        self.layout.addWidget(self.tableVmag)
+        self.table = QTableView()
+        minpol = QSizePolicy.Minimum
+        self.table.setSizePolicy(minpol, minpol)
+    
+    
+        self.updateInd(self.parent.code_int)
+        self.table.setFixedSize(345, 100)
+        self.layout.addWidget(self.table)
         
-        self.makeButton()
         #buttonParent = buttonPlusMinus()
         #buttonParent.makeButton(self)
+        
+    def getData(self):
+        ncols = self.ncols
+        nrows = 2
+        data = []
+        for j in xrange(ncols):
+            tmp = []
+            for i in xrange(nrows):
+                index = self.model.index(i, j, QModelIndex())
+                string = self.model.data(index)
+                
+                if ((string == u'<Не учитывается>') or
+                   (string.startswith('> '))):
+                    string = None
+                else:
+                    string = float(string)
+                tmp.append( string )
+            data.append(tmp)
+        return data      
+        
+    def fillTable(self, data):
+        self.ncols = len(data)
+        self.model = QStandardItemModel(2, self.ncols, self)
+        self.table.setModel(self.model)
+        self.model.setVerticalHeaderLabels(['Vmag', 'Dist.'])
+        self.data = data
+        if self.ncols == 1:
+            cont = u'<Не учитывается>'
+    
+        for j in xrange(len(data)):
+            for i in xrange(len(data[j])):
+                if data[j][i] is None:
+                    if self.ncols == 1:
+                        content = u'<Не учитывается>'
+                    else:
+                        content = '> ' + str(data[j-1][i])
+                    item = QStandardItem(content)
+                else:
+                    item = QStandardItem(str(data[j][i]))
+                self.model.setItem(i, j, item)
+                    
+        self.table.resizeColumnsToContents()
+        #sself.table.setColumnWidth(30, 20)
+        self.table.resizeRowsToContents()
+        vertheader = self.table.verticalHeader()
+        vertheader.setSectionResizeMode(QHeaderView.Stretch)
+        #horheader = self.table.horizontalHeader()
+        #horheader.setSectionResizeMode(QHeaderView.Stretch)
+        #self.table.horizontalHeader().setMinimumSectionSize(20)
+    
+     
+    def updateInd(self, ind):
+        code = self.parent.flist[ind]['code']
+        data = eval(self.parent.dictpar[code]['vphi'])
+        self.fillTable(data)
+        
+    def onActivatedPlus(self):        
+
+        data = self.getData()
+        if len(data) == 1:
+            data[-1][0] = 0
+        else:
+            data[-1][0] = data[-2][0]
+        new_element = [None, data[-1][1]]
+        data.append(new_element)
+        self.fillTable(data)
+        #ind = self.parent.code_int
+        #code = self.parent.flist[ind]['code']
+        #self.parent.dictpar[code]['vphi'] = str(data)
+        
+    def connectPlus(self):
+        self.btn2.clicked.connect(self.onActivatedPlus)
+        
+    def onActivatedMinus(self):
+        if len(self.data) == 1:
+            return        
+        data = self.getData()
+        data = data[:-1]
+        data[-1][0] = None
+        self.fillTable(data)
+        #ind = self.parent.code_int
+        #code = self.parent.flist[ind]['code']
+        #self.parent.dictpar[code]['vphi'] = str(data)
+        
+    def connectMinus(self):
+        self.btn3.clicked.connect(self.onActivatedMinus)
+    
+    def onActivatedSave(self):
+        data = self.getData()
+        ind = self.parent.code_int
+        code = self.parent.flist[ind]['code']
+        self.parent.dictpar[code]['vphi'] = str(data)
+        self.parent.save_parameter(data)
+        
+    def connectSave(self):
+        self.btn1.clicked.connect(self.onActivatedSave)
         
         
     def initUI(self):
         self.layout = QVBoxLayout()
-
-    
+            
         self.setAutoFillBackground(True)
         palette = self.palette()
         palette.setColor(self.backgroundRole(), QColor('white'))
@@ -207,27 +323,11 @@ class ParameterList(QFrame):
         self.setFrameShadow(_frameShadow)
         self.setLineWidth(_lineWidth)
         self.setMidLineWidth(_midLineWidth)
+        
+        self.dLayout = QHBoxLayout()
+
+        
         return    
-        combo = QComboBox(self)
-        
-        self.flist = self.load_list()
-        self.lbl = QLabel('', self)
-        self.descr = QLabel('', self)
-        self.descr.setWordWrap(True)
-        self.onActivated(0)
-
-        for x in self.flist:
-            combo.addItem(x['name'])
-        
-        combo.move(50, 50)
-        self.lbl.move(50, 150)
-        self.descr.move(150, 50)
-
-        combo.activated[int].connect(self.onActivated) 
-         
-        #self.setGeometry(300, 300, 400, 200)
-        #self.setWindowTitle(u'Выбор каталога')
-        #self.show()
             
 
         
@@ -346,9 +446,9 @@ class Worker(QObject):
                         directory=parent.settings_dirname,
                         filename=parent.settings_filename,
                         progressBar=pbar)
-        except astroquery.exceptions.TimeoutError:
+        #except astroquery.exceptions.TimeoutError:
             #self.message.emit('Timeout')
-            pass
+        #    pass
         except KeyboardInterrupt:
             pass
         finally:
@@ -408,9 +508,9 @@ class MainProcess(QFrame):
             self.thread.finished.connect(self.update_button)
             #self.worker.stoping.connect(self.thread.terminate)
             #self.btn.clicked.connect(self.worker.stop)
-            QtCore.QMetaObject.invokeMethod(self.worker, 'process', Qt.QueuedConnection,
-                                            QtCore.Q_ARG(object, self.parent),
-                                            QtCore.Q_ARG(object, self.pbar))
+            QMetaObject.invokeMethod(self.worker, 'process', Qt.QueuedConnection,
+                                            Q_ARG(object, self.parent),
+                                            Q_ARG(object, self.pbar))
                                             
             self.thread.start()
         else:
