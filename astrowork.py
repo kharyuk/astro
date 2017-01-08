@@ -145,7 +145,7 @@ def aw_main_process(code, day_start, day_end, mpf=12,
     
     curmonth = curdate.month 
     wb = xlwt.Workbook()
-    sheetname = curdate.strftime('%h') + ' ' + str(curdate.year)[-2:]
+    sheetname = curdate.strftime('%b') + ' ' + str(curdate.year)[-2:]
     sheet_num = 0
     ws = wb.add_sheet(sheetname.decode('utf8'))
     rowx, colx = make_list_header(ws, code, code_table)
@@ -179,7 +179,7 @@ def aw_main_process(code, day_start, day_end, mpf=12,
                 wb = xlwt.Workbook()
                 sheet_num = 0
                 day_start = curdate + datetime.timedelta(days=0)
-            sheetname = curdate.strftime('%h') + ' ' + str(curdate.year)[-2:]
+            sheetname = curdate.strftime('%b') + ' ' + str(curdate.year)[-2:]
             ws = wb.add_sheet(sheetname.decode('utf8'))
             rowx, colx = make_list_header(ws, code, code_table)
             

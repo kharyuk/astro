@@ -6,18 +6,24 @@ import datetime
 import csv
 
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QLabel,  QPushButton, QSizePolicy,
-    QComboBox, QApplication, QGridLayout, QProgressBar,
+    QComboBox, QApplication, QGridLayout, QProgressBar, QStyledItemDelegate, QLineEdit,
     QCalendarWidget, QFrame, QTableView, QVBoxLayout, QHeaderView, QHBoxLayout)
-from PyQt5.QtGui import QColor, QStandardItemModel, QStandardItem
+from PyQt5.QtGui import QColor, QStandardItemModel, QStandardItem, QRegExpValidator
 from PyQt5.QtCore import (pyqtSlot, QObject, pyqtSignal, QThread, QDate, Qt,
-                           QModelIndex, Q_ARG, QMetaObject)
+                           QModelIndex, Q_ARG, QMetaObject, QRegExp)
 
 
 from astrowork import aw_main_process
 #import astroquery
 
+UBUNTU = 'UBUNTU'
+WIN = 'WIN'
 
-import appdirs
+SYSTEM = UBUNTU
+
+
+if SYSTEM == UBUNTU:
+    import appdirs
 import six
 import packaging
 import packaging.version
@@ -78,6 +84,22 @@ def saveVmag(data):
             writer.writerow(row)
     return
     
+class ValidatedItemDelegate(QStyledItemDelegate):
+    def createEditor(self, widget, option, index):
+        if not index.isValid():
+            return 0
+        string = index.data()
+        #if ((string == u'<Не учитывается>') or
+        #    (string.startswith('> '))):
+        #    regExp = 
+        #if ((index.column() == 0) and
+        #    (index.row() == 0): #only on the cells in the first column
+        editor = QLineEdit(widget)
+        validator = QRegExpValidator(QRegExp("^[-+]?[0-9]*\.?[0-9]+$"), editor)
+        editor.setValidator(validator)
+        
+        return editor
+        #return super(ValidatedItemDelegate, self).createEditor(widget, option, index)
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -139,8 +161,22 @@ class MainWindow(QMainWindow):
         return dictpar
         
     def save_parameter(self, data):
-        print 'SAVING...'
-        print 'Not Implemented'
+        ncols = len(data)
+        nrows = 2
+        assert len(data[0]) == nrows
+        for j in xrange(ncols):
+            current = data[j]
+            if j > 0:
+                if (previous[0] >= current[0]):
+                    data[j][0] = None
+                    data = data[:j+1]
+                    break
+                if previous[1] <= current[1]:
+                    data[j-1][0] = None
+                    data = data[:j]
+                    break
+            previous = current
+        
         lst = []
         ind = self.code_int
         code = self.flist[ind]['code']
@@ -157,28 +193,11 @@ class MainWindow(QMainWindow):
             for row in lst:
                 writer.writerow(row)
         
-        return
-        ncols = len(data)
-        nrows = 2
-        assert len(data[0]) == nrows
-        for j in xrange(ncols):
-            if j > 0:
-                if j == ncols-1:
-                    if data[j][0] is not None:
-                        data[j][0] = None
-                else:
-                    if data[j][0] is None:
-                        ncols = j+1
-                        data = data[:j+1]
-                        data[j][0] = None
-                    current = [float(data[j][0]), float(data[j][1]) ]
-                    if pred[0] >= current[0]:
-                        ncols = j+1
-                        data = data[:j+1]
-                        data[j][0] = None
-                    if pred[1] <= current[1]:
-                        ncols = j
-                        data = data[:j]
+        return data
+
+        
+        
+        
 class ParameterList(QFrame):
     def __init__(self, parent):
         super(ParameterList, self).__init__() 
@@ -205,6 +224,7 @@ class ParameterList(QFrame):
         self.table = QTableView()
         minpol = QSizePolicy.Minimum
         self.table.setSizePolicy(minpol, minpol)
+        self.table.setItemDelegate(ValidatedItemDelegate())
     
     
         self.updateInd(self.parent.code_int)
@@ -250,6 +270,7 @@ class ParameterList(QFrame):
                     else:
                         content = '> ' + str(data[j-1][i])
                     item = QStandardItem(content)
+                    item.setFlags((item.flags() & Qt.ItemIsEditable))
                 else:
                     item = QStandardItem(str(data[j][i]))
                 self.model.setItem(i, j, item)
@@ -305,7 +326,8 @@ class ParameterList(QFrame):
         ind = self.parent.code_int
         code = self.parent.flist[ind]['code']
         self.parent.dictpar[code]['vphi'] = str(data)
-        self.parent.save_parameter(data)
+        data = self.parent.save_parameter(data)
+        self.fillTable(data)
         
     def connectSave(self):
         self.btn1.clicked.connect(self.onActivatedSave)
@@ -345,7 +367,12 @@ class DateInputW(QFrame):
         self.cal1.setDateEditEnabled(True)
 
         self.cal1.clicked.connect(self.setDateStart)
-        self.cal1.setFixedSize(200, 160)
+        if SYSTEM == UBUNTU:        
+            self.cal1.setFixedSize(200, 160)
+        elif SYSTEM == WIN:
+            self.cal1.setFixedSize(250, 200)
+        else:
+            raise NotImplementedError
         ymd1 = [parent.day_start.year, parent.day_start.month, parent.day_start.day]
         qdate1 = QDate()
         qdate1.setDate(ymd1[0], ymd1[1], ymd1[2])
@@ -362,7 +389,12 @@ class DateInputW(QFrame):
         self.cal2.setDateEditEnabled(True)
 
         self.cal2.clicked.connect(self.setDateEnd)
-        self.cal2.setFixedSize(200, 160)
+        if SYSTEM == UBUNTU:        
+            self.cal2.setFixedSize(200, 160)
+        elif SYSTEM == WIN:
+            self.cal2.setFixedSize(250, 200)
+        else:
+            raise NotImplementedError
         ymd2 = [parent.day_end.year, parent.day_end.month, parent.day_end.day]
         qdate2 = QDate()
         qdate2.setDate(ymd2[0], ymd2[1], ymd2[2])
