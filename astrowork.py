@@ -223,22 +223,24 @@ def aw_main_process(code, day_start, day_end, mpf=12,
             if code_table[code]['phi_vec']:
                 refuse = True
                 vmag = row['FLUX_V']
-                if (str(vmag)!='--'):
+                #if (str(vmag)!='--'):
+                if (str(vmag)!=''):
+                    vmag = float(vmag)
                     for [vml, hdl] in code_table[code]['vphi']:
                         if vml is None:
                             if hdist >= hdl:
-                                break
+                                continue
                             else:
                                 refuse = False
                                 break
                         elif vmag < vml:
                             if hdist >= hdl:
-                                break
+                                continue
                             else:
                                 refuse = False
                                 break
                 if refuse:
-                    print 'refused: %s' % (row['MAIN_ID'])
+                    print 'refused: %s %s %f' % (row['MAIN_ID'], str(vmag), hdist)
                     continue
             
             
@@ -295,6 +297,21 @@ def aw_main_process(code, day_start, day_end, mpf=12,
     return
     
 if __name__ == '__main__':
-    d1 = datetime.datetime.strptime('01/04/2016', '%d/%m/%Y')
-    d2 = datetime.datetime.strptime('01/05/2016', '%d/%m/%Y')
-    aw_main_process('gcl', d1, d2)
+    d1 = datetime.datetime.strptime('01/01/2013', '%d/%m/%Y')
+    d2 = datetime.datetime.strptime('01/01/2038', '%d/%m/%Y')
+    cat = [
+           #'aco',
+           #'gcl',
+           #'hh',
+           #'hip'#,
+           #'lbn',
+           'leda'#,
+           #'ocl',
+           #'pn',
+           #'qso'#,
+           #'snr'
+           ]
+    for c in cat:
+        aw_main_process(c, d1, d2)
+        
+    #raise ConnectionError(e, request=request)

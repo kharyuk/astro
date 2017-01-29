@@ -96,8 +96,15 @@ def find_inter(date, obj1, obj2):
     def func(x):
         obj1.compute(x)
         obj2.compute(x)
-        dist = obj1.a_ra - obj2.a_ra
-        dist *= 180./np.pi
+        ra1 = obj1.a_ra * 12./np.pi
+        ra2 = obj2.a_ra * 12./np.pi
+        
+        dist = ra2 - ra1
+        if abs(dist) > 12.:
+            if ra1 < ra2:
+                dist -= 24.
+            else:
+                dist += 24
         return dist
         
     date_prev = date - datetime.timedelta(days=1)
@@ -109,8 +116,8 @@ def find_inter(date, obj1, obj2):
 
     a = ephem.date(gatech1)
     b = ephem.date(gatech2)
-                    
     t0 = brentq(func, a, b)
+
     time = coord(0, 0, (t0 - a)*24.*60.*60., 1, 'ra')
     return t0, time
     
@@ -174,10 +181,28 @@ def as_main_work(day_start,
                 break
             aster = ephem.readdb(db_entry)
             sun = ephem.Sun()
-            [[aster2_ra, aster2_dec], [aster1_ra, aster1_dec]] = ephobj(aster, curdate)
-            [[sun2_ra, sun2_dec], [sun1_ra, sun1_dec]] = ephobj(sun, curdate)
-            dif_ra1 = aster1_ra - sun1_ra
-            dif_ra2 = aster2_ra - sun2_ra
+            [[aster1_ra, aster1_dec], [aster2_ra, aster2_dec]] = ephobj(aster, curdate)
+            [[sun1_ra, sun1_dec], [sun2_ra, sun2_dec]] = ephobj(sun, curdate)
+            
+            
+            sun1_ra = float(sun1_ra) * 12./np.pi
+            sun2_ra = float(sun2_ra) * 12./np.pi
+            if sun2_ra < sun1_ra:
+                sun2_ra += 24.
+            
+            aster1_ra = float(aster1_ra) * 12./np.pi
+            aster2_ra = float(aster2_ra) * 12./np.pi
+            if abs(aster1_ra - aster2_ra) > 12.:
+                if aster1_ra < aster2_ra:
+                    aster1_ra += 24.
+                else:
+                    aster2_ra += 24.
+            
+            
+            dif_ra1 = min(aster1_ra, aster2_ra) - sun1_ra
+            dif_ra2 = max(aster1_ra, aster2_ra) - sun2_ra
+            
+            
             '''
             print sun1_ra, sun2_ra
             print aster1_ra, aster2_ra
@@ -189,7 +214,7 @@ def as_main_work(day_start,
             t0, time = find_inter(curdate, aster, sun)
             sun.compute(t0)
             aster.compute(t0)
-            if abs(sun.a_ra - aster.a_ra)* 180./np.pi > 1e-3:
+            if abs(sun.a_ra - aster.a_ra)* 12./np.pi > 1e-3:
                 continue
                 
             line = [curdate.strftime('%d/%m/%Y'), time.__str__(rpar=0)]
@@ -233,7 +258,7 @@ def as_main_work(day_start,
     return
 
 if __name__ =='__main__':
-    day_start = datetime.date(2030, 1, 1)
+    day_start = datetime.date(2013, 1, 1)
     day_end = datetime.date(2038, 1, 1)  #day_start + datetime.timedelta(days=5)
     as_main_work(day_start,
                  day_end,
