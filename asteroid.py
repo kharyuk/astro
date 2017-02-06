@@ -91,6 +91,7 @@ def get_db(dbfnm, max_entry, skip=None):
                     continue
             r = f.readline()
             rv.append(r)
+    #np.savez_compressed('aster_db.npz', rv=rv)
     return rv
     
 def find_inter(date, obj1, obj2):
@@ -177,7 +178,10 @@ def as_main_work(day_start,
             rowx, colx = make_list_header(ws)
             
         lines = []
+        idxDb = 0
         for db_entry in db:
+            idxDb += 1
+            print "%i/%i" % (idxDb, len(db))
             if len(db_entry) < 2:
                 break
             aster = ephem.readdb(db_entry)
@@ -259,8 +263,8 @@ def as_main_work(day_start,
     return
 
 if __name__ =='__main__':
-    day_start = datetime.date(2017, 1, 1)
-    day_end = datetime.date(2018, 1, 1)  #day_start + datetime.timedelta(days=5)
+    day_start = datetime.date(2017, 2, 7)
+    day_end = datetime.date(2017, 2, 8)  #day_start + datetime.timedelta(days=5)
     as_main_work(day_start,
                  day_end,
                  mpf=12,
