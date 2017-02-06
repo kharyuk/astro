@@ -305,8 +305,8 @@ if __name__ == '__main__':
            #'hh',
            #'hip'#,
            #'lbn',
-           'leda'#,
-           #'ocl',
+           #'leda'#,
+           'ocl'#,
            #'pn',
            #'qso'#,
            #'snr'

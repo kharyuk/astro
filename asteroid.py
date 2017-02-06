@@ -22,7 +22,8 @@ from bs4 import BeautifulSoup
 
 #_URLMPC = 'http://mpc.cfa.harvard.edu/ws/search'
 
-_DBMPC = 'side/large.edb'
+#_DBMPC = 'side/large.edb'
+_DBMPC = 'side/all.edb'
 OUTPUTDIR = './result/'
     
 def ephobj(obj, date):
@@ -258,13 +259,14 @@ def as_main_work(day_start,
     return
 
 if __name__ =='__main__':
-    day_start = datetime.date(2013, 1, 1)
-    day_end = datetime.date(2038, 1, 1)  #day_start + datetime.timedelta(days=5)
+    day_start = datetime.date(2017, 1, 1)
+    day_end = datetime.date(2018, 1, 1)  #day_start + datetime.timedelta(days=5)
     as_main_work(day_start,
                  day_end,
                  mpf=12,
                  declim=16.,
-                 max_entry=412,
+                 #max_entry=412,
+                 max_entry=727916,
                  dbfnm = _DBMPC,
                  progressBar=None)
 
