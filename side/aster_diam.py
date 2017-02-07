@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import numpy as np
 
 _DBMPC = 'all.edb'
+_M = 65500
 
 def write_row(ws, buffer_list, rowx, colx=0):
     for element in buffer_list:
@@ -27,9 +28,24 @@ def jpl_diam(objname):
         diam = '--'
     return str(diam)
     
+def get_aster_diam_fxls(fname, startRow=3, sheetN=0):
+    wb = xlrd.open_workbook(fname)
+    ws = wb.sheet_by_index(sheetN)
+    lookup = dict(zip(w.col_values(0, startRow, w.nrows), w.col_values(1, startRow, w.nrows)))
+    return lookup
+    
+def ad_from_npz(fname):
+    db = np.load(fname)
+    
+    data = db['data'].T.tolist()
+    lookup = dict(zip(data[0], data[1]))
+    return lookup
+    
+    
 if __name__ == '__main__':
     wb = xlwt.Workbook()
-    ws = wb.add_sheet(_DBMPC)
+    lst = 2
+    ws = wb.add_sheet(_DBMPC + '_'  str(lst))
     style_string = "font: bold on"
     style = xlwt.easyxf(style_string)
     [rowx, colx] = [0, 0]
@@ -51,9 +67,24 @@ if __name__ == '__main__':
     max_entry = len(r)
     i = 0
     tcpy = []
-    for db_entry in r:
+    for db_entry in r[65530:]:
         i += 1
-
+        if (i % _M) == 0:
+            ws = wb.add_sheet(_DBMPC + '_'  str(lst))
+            style_string = "font: bold on"
+            style = xlwt.easyxf(style_string)
+            [rowx, colx] = [0, 0]
+            ws.write(rowx, colx, 'Астероиды: диаметры (JPL)'.decode('utf8'), style=style)
+            rowx += 1
+            ws.write(rowx, colx, 'Asteroids: diameters (JPL)'.decode('utf8'), style=style)
+            rowx += 1
+            ws.write(rowx, colx, 'Name'.decode('utf8'), style=style)
+            colx += 1
+            ws.write(rowx, colx, 'Diameter'.decode('utf8'), style=style)
+            rowx += 1
+            colx = 0
+            
+            lst += 1
         #dbE = ephem.readdb(db_entry)
         name = db_entry.split(',')[0]
         diam = jpl_diam(name)
