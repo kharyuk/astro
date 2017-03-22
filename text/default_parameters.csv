@@ -1,11 +1,11 @@
 code,vphi,columns,use_name
 'aco','[[None,30.]]','aco',1
-'gcl','[[None,20.]]','ngc|m',1
-'hh','[[None,3.]]','hh|ngc',1
-'hip','[[3.,17.],[4.,15.],[5.,14.],[6.,13.],[7.,12.],[8.,8.],[9.,4.],[11.,2.],[None,1.]]','hip|hd|*',1
+'gcl','[[None,30.]]','ngc|m',1
+'hh','[[None,30.]]','hh|ngc',1
+'hip','[[None,17.]]','hip|hd|*',1
 'lbn','[[None,18.]]','lbn|ngc|m',1
-'leda','[[4., 15.],[5.,14.],[6.,13.],[7.,12.],[8.,8.],[9.,4.],[11.,2.],[None,1.]]','leda|ngc|m',1
-'ocl','[[None,20.]]','ngc|m',1
-'pn','[[None,5.]]','pn|ngc',1
+'leda','[[None, 20.]]','leda|ngc|m',1
+'ocl','[[None,30.]]','ngc|m',1
+'pn','[[None,15.]]','pn|ngc',1
 'qso','[[None,30.]]','qso',1
 'snr','[[None,20.]]','snr|ngc|m',1

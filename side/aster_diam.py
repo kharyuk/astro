@@ -7,6 +7,8 @@ import numpy as np
 
 _DBMPC = 'all.edb'
 _M = 65500
+offset = 698630
+
 
 def write_row(ws, buffer_list, rowx, colx=0):
     for element in buffer_list:
@@ -44,8 +46,8 @@ def ad_from_npz(fname):
     
 if __name__ == '__main__':
     wb = xlwt.Workbook()
-    lst = 2
-    ws = wb.add_sheet(_DBMPC + '_'  str(lst))
+    lst = 6
+    ws = wb.add_sheet(_DBMPC + '_' + str(lst))
     style_string = "font: bold on"
     style = xlwt.easyxf(style_string)
     [rowx, colx] = [0, 0]
@@ -67,10 +69,11 @@ if __name__ == '__main__':
     max_entry = len(r)
     i = 0
     tcpy = []
-    for db_entry in r[65530:]:
+    for db_entry in r[offset:]:
         i += 1
         if (i % _M) == 0:
-            ws = wb.add_sheet(_DBMPC + '_'  str(lst))
+            lst += 1
+            ws = wb.add_sheet(_DBMPC + '_' + str(lst))
             style_string = "font: bold on"
             style = xlwt.easyxf(style_string)
             [rowx, colx] = [0, 0]
@@ -84,12 +87,11 @@ if __name__ == '__main__':
             rowx += 1
             colx = 0
             
-            lst += 1
         #dbE = ephem.readdb(db_entry)
         name = db_entry.split(',')[0]
         diam = jpl_diam(name)
         rowx, colx = write_row(ws, [name, diam], rowx)
-        print "%i/%i: %s %s" % (i, max_entry, name, diam)
+        print "%i/%i: %s %s" % (i, max_entry-offset, name, diam)
         tcpy.append([name, diam])
         if ((i % 10) == 0):
             np.savez_compressed("buf_aster_diam", data=tcpy)
