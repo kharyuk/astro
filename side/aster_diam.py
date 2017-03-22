@@ -7,6 +7,8 @@ import numpy as np
 
 _DBMPC = 'all.edb'
 _M = 65500
+offset = 698630
+
 
 def write_row(ws, buffer_list, rowx, colx=0):
     for element in buffer_list:
@@ -67,7 +69,7 @@ if __name__ == '__main__':
     max_entry = len(r)
     i = 0
     tcpy = []
-    for db_entry in r[65530:]:
+    for db_entry in r[offset:]:
         i += 1
         if (i % _M) == 0:
             lst += 1
@@ -86,11 +88,12 @@ if __name__ == '__main__':
             colx = 0
             
 
+
         #dbE = ephem.readdb(db_entry)
         name = db_entry.split(',')[0]
         diam = jpl_diam(name)
         rowx, colx = write_row(ws, [name, diam], rowx)
-        print "%i/%i: %s %s" % (i, max_entry, name, diam)
+        print "%i/%i: %s %s" % (i, max_entry-offset, name, diam)
         tcpy.append([name, diam])
         if ((i % 10) == 0):
             np.savez_compressed("buf_aster_diam", data=tcpy)

@@ -297,17 +297,17 @@ def aw_main_process(code, day_start, day_end, mpf=12,
     return
     
 if __name__ == '__main__':
-    d1 = datetime.datetime.strptime('01/01/2013', '%d/%m/%Y')
+    d1 = datetime.datetime.strptime('01/01/2015', '%d/%m/%Y')
     d2 = datetime.datetime.strptime('01/01/2038', '%d/%m/%Y')
     cat = [
            #'aco',
            #'gcl',
            #'hh',
-           #'hip'#,
+           #'hip',
            #'lbn',
-           #'leda'#,
-           'ocl'#,
-           #'pn',
+           'leda'#,
+           #'ocl',
+           #'pn'#,
            #'qso'#,
            #'snr'
            ]
