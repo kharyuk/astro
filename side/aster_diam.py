@@ -45,7 +45,7 @@ def ad_from_npz(fname):
 if __name__ == '__main__':
     wb = xlwt.Workbook()
     lst = 2
-    ws = wb.add_sheet(_DBMPC + '_'  str(lst))
+    ws = wb.add_sheet(_DBMPC + '_' + str(lst))
     style_string = "font: bold on"
     style = xlwt.easyxf(style_string)
     [rowx, colx] = [0, 0]
@@ -70,7 +70,8 @@ if __name__ == '__main__':
     for db_entry in r[65530:]:
         i += 1
         if (i % _M) == 0:
-            ws = wb.add_sheet(_DBMPC + '_'  str(lst))
+            lst += 1
+            ws = wb.add_sheet(_DBMPC + '_' + str(lst))
             style_string = "font: bold on"
             style = xlwt.easyxf(style_string)
             [rowx, colx] = [0, 0]
@@ -84,7 +85,7 @@ if __name__ == '__main__':
             rowx += 1
             colx = 0
             
-            lst += 1
+
         #dbE = ephem.readdb(db_entry)
         name = db_entry.split(',')[0]
         diam = jpl_diam(name)

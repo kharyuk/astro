@@ -20,11 +20,20 @@ import csv
 import urllib
 from bs4 import BeautifulSoup
 
+import cPickle
+
 #_URLMPC = 'http://mpc.cfa.harvard.edu/ws/search'
 
 #_DBMPC = 'side/large.edb'
 _DBMPC = 'side/all.edb'
 OUTPUTDIR = './result/'
+    
+def pickleLoad(fname):
+    with open(fname, 'rb') as f:
+        pickled = f.read()
+        # pickled = pylzma.decompress(pickled)
+        df = cPickle.loads(pickled)
+    return df
     
 def ephobj(obj, date):
     # Moscow coordinates
@@ -58,7 +67,6 @@ def make_list_header(ws):
     rowx += 1
     base = ['Date',
             'Time',
-            'No.',
             'Name',
             'Diameter',
             'Distance',
@@ -79,8 +87,11 @@ def write_row(ws, buffer_list, rowx, colx=0):
     colx = 0
     return rowx, colx
     
-def get_db(dbfnm, max_entry, skip=None):
+def get_db(dbfnm, max_entry, df=None, skip=None):
     rv = []
+    if df is not None:
+        keys = df.keys()
+        keys = set(keys)
     with open(dbfnm, 'r+') as f:
         r = '#'
         while r.startswith('#'):
@@ -90,6 +101,10 @@ def get_db(dbfnm, max_entry, skip=None):
                 if idx in skip:
                     continue
             r = f.readline()
+            if df is not None:
+                name = r.split(',')[0]
+                if name not in keys:
+                    continue
             rv.append(r)
     #np.savez_compressed('aster_db.npz', rv=rv)
     return rv
@@ -225,10 +240,136 @@ def as_main_work(day_start,
             line = [curdate.strftime('%d/%m/%Y'), time.__str__(rpar=0)]
             #print t0, time
             name = db_entry.split(',')[0]
-            [nom, name] = name.split(' ', 1)
-            line.append(nom)
             line.append(name)
-            diam = jpl_diam(name)
+            diam = '--'#jpl_diam(name)
+            line.append(diam)
+            
+            aster_ra = str(aster.a_ra)
+            aster_dec = str(aster.a_dec)
+            dist = ephem.degrees(aster.a_dec - sun.a_dec) 
+            if abs(dist) * 180. / np.pi > declim:
+                continue
+            line.append(str(dist))
+            line.append(aster_ra)
+            line.append(aster_dec)
+            
+            lines.append(line)
+            
+            objects_per_day += 1
+        curdate = curdate + datetime.timedelta(days=1)
+        if objects_per_day > 0:
+            lines = sorted(lines, key=lambda x: x[-2])
+            for line in lines:
+                rowx, colx = write_row(ws, line, rowx, colx)
+            rowx, colx = write_row(ws, [''], rowx, colx)
+        print "Day %d/%d finished" % (numday+1, all_days)
+        if progressBar is not None:
+            progressBar.setValue((numday+1.0) / all_days * 100)
+    filename = 'Asteroids_'
+    filename += day_start.strftime('%d-%m-%Y')
+    filename += '--'
+    filename += day_end.strftime('%d-%m-%Y')
+    filename += '.xls'
+    full_filename = OUTPUTDIR+filename
+    print full_filename
+    wb.save(full_filename)
+    return
+    
+def as_main_work_df(df,
+                 day_start,
+                 day_end,
+                 mpf=12,
+                 declim=16.,
+                 max_entry=412,
+                 dbfnm = _DBMPC,
+                 progressBar=None):
+    
+    style_string = "font: bold on"
+    style = xlwt.easyxf(style_string)
+    
+    curdate = day_start
+    
+    curmonth = curdate.month 
+    wb = xlwt.Workbook()
+    sheetname = curdate.strftime('%h') + ' ' + str(curdate.year)[-2:]
+    sheet_num = 0
+    ws = wb.add_sheet(sheetname.decode('utf8'))
+    rowx, colx = make_list_header(ws)
+    
+    all_days = (day_end - day_start).days
+    
+    db = get_db(dbfnm, max_entry, df, skip=None)
+    for numday in xrange(all_days):
+        objects_per_day = 0
+        if curdate.month != curmonth:
+            curmonth = curdate.month
+            sheet_num += 1
+            if sheet_num == mpf:
+                filename = 'Asteroids_'
+                filename += day_start.strftime('%d-%m-%Y')
+                filename += '--'
+                filename += (curdate-datetime.timedelta(days=1)).strftime('%d-%m-%Y')
+                filename += '.xls'
+                wb.save(OUTPUTDIR+filename)
+                wb = xlwt.Workbook()
+                sheet_num = 0
+                day_start = curdate + datetime.timedelta(days=0)
+            sheetname = curdate.strftime('%h') + ' ' + str(curdate.year)[-2:]
+            ws = wb.add_sheet(sheetname.decode('utf8'))
+            rowx, colx = make_list_header(ws)
+            
+        lines = []
+        idxDb = 0
+        for db_entry in db:
+            #idxDb += 1
+            #print "%i/%i" % (idxDb, len(db))
+            if len(db_entry) < 2:
+                break
+            aster = ephem.readdb(db_entry)
+            sun = ephem.Sun()
+            [[aster1_ra, aster1_dec], [aster2_ra, aster2_dec]] = ephobj(aster, curdate)
+            [[sun1_ra, sun1_dec], [sun2_ra, sun2_dec]] = ephobj(sun, curdate)
+            
+            
+            sun1_ra = float(sun1_ra) * 12./np.pi
+            sun2_ra = float(sun2_ra) * 12./np.pi
+            if sun2_ra < sun1_ra:
+                sun2_ra += 24.
+            
+            aster1_ra = float(aster1_ra) * 12./np.pi
+            aster2_ra = float(aster2_ra) * 12./np.pi
+            if abs(aster1_ra - aster2_ra) > 12.:
+                if aster1_ra < aster2_ra:
+                    aster1_ra += 24.
+                else:
+                    aster2_ra += 24.
+            
+            
+            dif_ra1 = min(aster1_ra, aster2_ra) - sun1_ra
+            dif_ra2 = max(aster1_ra, aster2_ra) - sun2_ra
+            
+            
+            '''
+            print sun1_ra, sun2_ra
+            print aster1_ra, aster2_ra
+            print dif_ra1, dif_ra2
+            print
+            '''
+            if dif_ra1 * dif_ra2 > 0:
+                continue
+            t0, time = find_inter(curdate, aster, sun)
+            sun.compute(t0)
+            aster.compute(t0)
+            if abs(sun.a_ra - aster.a_ra)* 12./np.pi > 1e-3:
+                continue
+                
+            line = [curdate.strftime('%d/%m/%Y'), time.__str__(rpar=0)]
+            #print t0, time
+            name = db_entry.split(',')[0]
+            line.append(name)
+            diam = str(df[name])
+            if diam == '--':
+                diam = jpl_diam(name)
             line.append(diam)
             
             aster_ra = str(aster.a_ra)
@@ -263,9 +404,12 @@ def as_main_work(day_start,
     return
 
 if __name__ =='__main__':
-    day_start = datetime.date(2017, 2, 7)
-    day_end = datetime.date(2017, 2, 8)  #day_start + datetime.timedelta(days=5)
-    as_main_work(day_start,
+    day_start = datetime.date(2013, 1, 1)
+    day_end = datetime.date(2038, 1, 1)  #day_start + datetime.timedelta(days=5)
+    df = pickleLoad('./diam/joint.pkl')
+    df = dict(filter(lambda (a, b): isinstance(b, float), df.iteritems()))
+    as_main_work_df(df,
+                 day_start,
                  day_end,
                  mpf=12,
                  declim=16.,
